@@ -22,6 +22,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     """
     serializer_class = ProjectSerializer
     permission_classes = [permissions.IsAuthenticated]
+    queryset = Project.objects.all()  # Add this line to fix the router issue
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['is_active', 'organization']
     search_fields = ['name', 'description']

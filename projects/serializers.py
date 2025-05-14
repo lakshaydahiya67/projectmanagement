@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Project, ProjectMember, Board, Column
+from .models import Project, ProjectMember, Board, Column, BoardViewer
 from users.serializers import UserSerializer
 from organizations.serializers import OrganizationSerializer
 
@@ -21,6 +21,14 @@ class BoardSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
         validated_data['created_by'] = user
         return super().create(validated_data)
+
+class BoardViewerSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    
+    class Meta:
+        model = BoardViewer
+        fields = ['id', 'user', 'joined_at', 'last_activity']
+        read_only_fields = ['joined_at', 'last_activity']
 
 class ProjectMemberSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)

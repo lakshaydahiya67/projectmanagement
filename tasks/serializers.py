@@ -88,11 +88,11 @@ class TaskDetailSerializer(TaskSerializer):
         return CommentSerializer(comments, many=True).data
 
 class TaskMoveSerializer(serializers.Serializer):
-    column = serializers.IntegerField()
+    column = serializers.UUIDField()
     order = serializers.IntegerField()
 
 class TaskAssignSerializer(serializers.Serializer):
     user_ids = serializers.ListField(
-        child=serializers.IntegerField(),
+        child=serializers.UUIDField(),
         required=True
     )

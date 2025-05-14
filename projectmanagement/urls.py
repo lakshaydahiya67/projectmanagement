@@ -46,6 +46,7 @@ api_patterns = [
     path('tasks/', include('tasks.urls')),
     path('notifications/', include('notifications.urls')),
     path('analytics/', include('analytics.urls')),
+    path('activity-logs/', include('activitylogs.urls')),
 ]
 
 urlpatterns = [

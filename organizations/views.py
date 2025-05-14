@@ -24,6 +24,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
     """
     serializer_class = OrganizationSerializer
     permission_classes = [permissions.IsAuthenticated]
+    queryset = Organization.objects.all()  # Add this line to fix the router issue
     
     def get_queryset(self):
         # Return organizations the user is a member of
@@ -92,16 +93,14 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             serializer = OrganizationInvitationSerializer(existing_invitation)
             return Response(serializer.data)
         
-        # Create invitation
-        expires_at = timezone.now() + datetime.timedelta(days=7)
-        invitation = OrganizationInvitation.objects.create(
+        # Create invitation - let the model's save method handle token generation
+        invitation = OrganizationInvitation(
             organization=organization,
             email=email,
             role=role,
             invited_by=request.user,
-            token=str(uuid.uuid4()),
-            expires_at=expires_at
         )
+        invitation.save()  # This will generate the token and set expires_at
         
         # TODO: Send email invitation
         
@@ -174,7 +173,7 @@ class OrganizationInvitationViewSet(viewsets.ModelViewSet):
         
         # Mark invitation as accepted
         invitation.accepted = True
-        invitation.save()
+        invitation.save(update_fields=['accepted'])
         
         return Response({"detail": "Successfully joined the organization."})
         
@@ -192,7 +191,7 @@ class OrganizationInvitationViewSet(viewsets.ModelViewSet):
         
         # Extend expiration date
         invitation.expires_at = timezone.now() + datetime.timedelta(days=7)
-        invitation.save()
+        invitation.save(update_fields=['expires_at'])
         
         # TODO: Resend email invitation
         

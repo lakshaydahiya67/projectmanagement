@@ -1,13 +1,16 @@
 from django.db import models
 from django.utils import timezone
 from users.models import User
-from projects.models import Project, Column
+import uuid
+# Use string references for foreign keys to avoid circular imports
+# from projects.models import Project, Column
 
 class Label(models.Model):
     """Label model for tasks"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=50)
     color = models.CharField(max_length=20, default="#1E88E5")  # Default blue color
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='labels')
+    project = models.ForeignKey('projects.Project', on_delete=models.CASCADE, related_name='labels')
     
     class Meta:
         unique_together = ['name', 'project']
@@ -30,9 +33,10 @@ class Task(models.Model):
         (URGENT, 'Urgent'),
     ]
     
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
-    column = models.ForeignKey(Column, on_delete=models.CASCADE, related_name='tasks')
+    column = models.ForeignKey('projects.Column', on_delete=models.CASCADE, related_name='tasks')
     order = models.PositiveIntegerField(default=0)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_tasks')
     created_at = models.DateTimeField(auto_now_add=True)

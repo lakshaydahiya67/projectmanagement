@@ -19,9 +19,9 @@ class ActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsOrganizationMember]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['action_type', 'entity_type', 'user', 'project']
-    search_fields = ['entity_name', 'description']
-    ordering_fields = ['created_at']
-    ordering = ['-created_at']
+    search_fields = ['entity_name']
+    ordering_fields = ['timestamp']
+    ordering = ['-timestamp']
     
     def get_queryset(self):
         organization_id = self.kwargs.get('organization_pk')
@@ -58,7 +58,7 @@ class ProjectMetricViewSet(viewsets.ReadOnlyModelViewSet):
         ).order_by('date')
         
         # Calculate summary metrics
-        total_tasks_created = metrics.aggregate(Sum('tasks_created'))['tasks_created__sum'] or 0
+        total_tasks = metrics.aggregate(Sum('tasks_total'))['tasks_total__sum'] or 0
         total_tasks_completed = metrics.aggregate(Sum('tasks_completed'))['tasks_completed__sum'] or 0
         total_tasks_overdue = metrics.aggregate(Sum('tasks_overdue'))['tasks_overdue__sum'] or 0
         avg_active_users = metrics.aggregate(Avg('active_users'))['active_users__avg'] or 0
@@ -66,7 +66,7 @@ class ProjectMetricViewSet(viewsets.ReadOnlyModelViewSet):
         # Format for chart data
         chart_data = {
             'labels': [metric.date.strftime('%Y-%m-%d') for metric in metrics],
-            'tasks_created': [metric.tasks_created for metric in metrics],
+            'tasks_total': [metric.tasks_total for metric in metrics],
             'tasks_completed': [metric.tasks_completed for metric in metrics],
             'tasks_overdue': [metric.tasks_overdue for metric in metrics],
             'active_users': [metric.active_users for metric in metrics],
@@ -74,11 +74,11 @@ class ProjectMetricViewSet(viewsets.ReadOnlyModelViewSet):
         
         return Response({
             'summary': {
-                'total_tasks_created': total_tasks_created,
+                'total_tasks': total_tasks,
                 'total_tasks_completed': total_tasks_completed,
                 'total_tasks_overdue': total_tasks_overdue,
                 'avg_active_users': round(avg_active_users, 2),
-                'completion_rate': round((total_tasks_completed / total_tasks_created) * 100, 2) if total_tasks_created > 0 else 0,
+                'completion_rate': round((total_tasks_completed / total_tasks) * 100, 2) if total_tasks > 0 else 0,
             },
             'chart_data': chart_data
         })
@@ -100,7 +100,7 @@ class ProjectMetricViewSet(viewsets.ReadOnlyModelViewSet):
         
         # Calculate cumulative metrics for burndown chart
         burndown_data = []
-        total_tasks = metrics.first().total_tasks if metrics.exists() else 0
+        total_tasks = metrics.first().tasks_total if metrics.exists() else 0
         remaining_tasks = total_tasks
         
         for metric in metrics:
@@ -150,8 +150,8 @@ class UserProductivityViewSet(viewsets.ReadOnlyModelViewSet):
         user_metrics = metrics.values('user', 'user__first_name', 'user__last_name').annotate(
             total_tasks_completed=Sum('tasks_completed'),
             total_tasks_created=Sum('tasks_created'),
-            total_comments=Sum('comments_added'),
-            total_time=Sum('time_tracked')
+            total_comments=Sum('comments_created'),
+            total_activity=Sum('total_activity')
         ).order_by('-total_tasks_completed')
         
         return Response(user_metrics)

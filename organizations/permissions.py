@@ -46,3 +46,33 @@ class IsOrganizationAdminOrReadOnly(permissions.BasePermission):
         
         # Write permissions are only allowed to admins
         return IsOrganizationAdmin().has_permission(request, view)
+
+class IsOrgMemberReadOnly(permissions.BasePermission):
+    """
+    Permission to allow read-only access to organization members.
+    Used for resources that are accessible to any organization member but can't be modified.
+    This is particularly useful for views like activity logs.
+    """
+    def has_permission(self, request, view):
+        # Only allow read methods (GET, HEAD, OPTIONS)
+        if request.method not in permissions.SAFE_METHODS:
+            return False
+            
+        # For non-project specific views, check if user is a member of any organization
+        if hasattr(request.user, 'memberships'):
+            return request.user.memberships.exists()
+            
+        return False
+        
+    def has_object_permission(self, request, view, obj):
+        # For object-level permissions (typically for retrieve, update, delete)
+        # Check if user is a member of the organization this object belongs to
+        # This assumes the object has a project_id field that links to a project
+        if not hasattr(obj, 'project_id') or not obj.project_id:
+            return False
+            
+        from projects.models import ProjectMember
+        return ProjectMember.objects.filter(
+            project_id=obj.project_id,
+            user=request.user
+        ).exists()

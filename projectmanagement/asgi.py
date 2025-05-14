@@ -11,18 +11,18 @@ import os
 from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
+from channels.security.websocket import AllowedHostsOriginValidator
+import projectmanagement.routing
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'projectmanagement.settings')
 
-# Import websocket routing after Django has been initialized
-django_application = get_asgi_application()
-from projectmanagement.routing import websocket_urlpatterns  # noqa
-
 application = ProtocolTypeRouter({
-    "http": django_application,
-    "websocket": AuthMiddlewareStack(
-        URLRouter(
-            websocket_urlpatterns
+    "http": get_asgi_application(),
+    "websocket": AllowedHostsOriginValidator(
+        AuthMiddlewareStack(
+            URLRouter(
+                projectmanagement.routing.websocket_urlpatterns
+            )
         )
     ),
 })

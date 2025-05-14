@@ -25,6 +25,9 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         )
         
         await self.accept()
+        
+        # Send the initial unread count
+        await self.send_unread_count()
     
     async def disconnect(self, close_code):
         # Leave the notification group
@@ -37,13 +40,80 @@ class NotificationConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         """
         Receive message from WebSocket.
-        This consumer doesn't expect to receive messages from clients.
+        Handle client requests like marking notifications as read.
         """
-        pass
+        try:
+            data = json.loads(text_data)
+            if data.get('action') == 'mark_as_read':
+                notification_id = data.get('notification_id')
+                if notification_id:
+                    await self.mark_notification_as_read(notification_id)
+                    await self.send_unread_count()
+            elif data.get('action') == 'mark_all_as_read':
+                await self.mark_all_notifications_as_read()
+                await self.send_unread_count()
+        except Exception as e:
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'message': str(e)
+            }))
     
     async def notification_message(self, event):
         """Send notification message to WebSocket"""
         await self.send(text_data=json.dumps({
             'type': 'notification',
             'notification': event['notification']
+        }))
+        
+        # Update unread count after sending a new notification
+        await self.send_unread_count()
+    
+    @database_sync_to_async
+    def mark_notification_as_read(self, notification_id):
+        """Mark a notification as read"""
+        from django.utils import timezone
+        from .models import Notification
+        
+        try:
+            notification = Notification.objects.get(
+                id=notification_id,
+                recipient=self.user
+            )
+            if not notification.read:
+                notification.read = True
+                notification.read_at = timezone.now()
+                notification.save()
+            return True
+        except Notification.DoesNotExist:
+            return False
+    
+    @database_sync_to_async
+    def mark_all_notifications_as_read(self):
+        """Mark all notifications as read"""
+        from django.utils import timezone
+        from .models import Notification
+        
+        Notification.objects.filter(
+            recipient=self.user,
+            read=False
+        ).update(read=True, read_at=timezone.now())
+        
+        return True
+    
+    @database_sync_to_async
+    def get_unread_count(self):
+        """Get the count of unread notifications"""
+        from .models import Notification
+        
+        return Notification.objects.filter(
+            recipient=self.user,
+            read=False
+        ).count()
+    
+    async def send_unread_count(self):
+        """Send unread count to the client"""
+        count = await self.get_unread_count()
+        await self.send(text_data=json.dumps({
+            'type': 'unread_count',
+            'count': count
         }))

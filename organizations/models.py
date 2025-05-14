@@ -1,9 +1,12 @@
 from django.db import models
 from django.utils import timezone
 from users.models import User
+import uuid
+import secrets
 
 class Organization(models.Model):
     """Organization model for multi-tenancy support"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
     logo = models.ImageField(upload_to='organization_logos/', blank=True, null=True)
@@ -47,6 +50,7 @@ class OrganizationMember(models.Model):
         
 class OrganizationInvitation(models.Model):
     """Invitation model for inviting users to an organization"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='invitations')
     email = models.EmailField()
     role = models.CharField(
@@ -66,3 +70,14 @@ class OrganizationInvitation(models.Model):
     @property
     def is_expired(self):
         return timezone.now() > self.expires_at
+        
+    def save(self, *args, **kwargs):
+        if not self.token:
+            # Generate a secure token
+            self.token = secrets.token_urlsafe(32)
+            
+        if not self.expires_at:
+            # Set expiration to 7 days from now
+            self.expires_at = timezone.now() + timezone.timedelta(days=7)
+            
+        super().save(*args, **kwargs)

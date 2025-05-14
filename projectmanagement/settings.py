@@ -13,6 +13,10 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 import os
 from datetime import timedelta
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,51 +26,108 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-j8l)e0!vcg6h*nbl0*qoo$@aox%8@64$&ykl=db9o4%q@y)t#b'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-j8l)e0!vcg6h*nbl0*qoo$@aox%8@64$&ykl=db9o4%q@y)t#b')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 
 # Application definition
 
 INSTALLED_APPS = [
-    'daphne', # For WebSocket support
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'django.contrib.staticfiles',
-    
-    # Third-party apps
-    'rest_framework',
-    'rest_framework.authtoken',
-    'corsheaders',
-    'djoser',
-    'channels',
-    
-    # Local apps
+    # Third-party apps will be inserted here
+]
+
+# Conditionally add third-party apps if installed
+try:
+    import daphne
+    INSTALLED_APPS.insert(0, 'daphne')  # Add daphne at the beginning
+except ImportError:
+    pass
+
+# Add staticfiles after potential daphne insertion
+INSTALLED_APPS.append('django.contrib.staticfiles')
+
+try:
+    import rest_framework
+    INSTALLED_APPS.append('rest_framework')
+    INSTALLED_APPS.append('rest_framework.authtoken')
+except ImportError:
+    pass
+
+try:
+    import corsheaders
+    INSTALLED_APPS.append('corsheaders')
+except ImportError:
+    pass
+
+try:
+    import djoser
+    INSTALLED_APPS.append('djoser')
+except ImportError:
+    pass
+
+try:
+    import channels
+    INSTALLED_APPS.append('channels')  # For WebSocket support
+except ImportError:
+    pass
+
+try:
+    import django_filters
+    INSTALLED_APPS.append('django_filters')
+except ImportError:
+    pass
+
+try:
+    import drf_yasg
+    INSTALLED_APPS.append('drf_yasg')
+except ImportError:
+    pass
+
+# Local apps
+INSTALLED_APPS += [
     'users',
     'organizations',
     'projects',
     'tasks',
     'notifications',
     'analytics',
+    'activitylogs',  # New app for activity logs and audit trail
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',  # CORS middleware
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# Add cors middleware if corsheaders is installed
+if 'corsheaders' in INSTALLED_APPS:
+    # Find the index for CommonMiddleware so we can insert CORS before it
+    try:
+        common_middleware_index = MIDDLEWARE.index('django.middleware.common.CommonMiddleware')
+        MIDDLEWARE.insert(common_middleware_index, 'corsheaders.middleware.CorsMiddleware')
+    except ValueError:
+        MIDDLEWARE.append('corsheaders.middleware.CorsMiddleware')
+
+# Add activity log middleware if it's available
+try:
+    import activitylogs.middleware
+    MIDDLEWARE.append('activitylogs.middleware.ActivityLogMiddleware')
+except ImportError:
+    pass
 
 ROOT_URLCONF = 'projectmanagement.urls'
 
@@ -94,8 +155,12 @@ WSGI_APPLICATION = 'projectmanagement.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3'),
+        'NAME': os.environ.get('DB_NAME', BASE_DIR / 'db.sqlite3'),
+        'USER': os.environ.get('DB_USER', ''),
+        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
+        'HOST': os.environ.get('DB_HOST', ''),
+        'PORT': os.environ.get('DB_PORT', ''),
     }
 }
 
@@ -135,6 +200,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -157,11 +223,18 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle'
+        'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.ScopedRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/day',
-        'user': '1000/day'
+        'user': '1000/day',
+        'auth': '5/minute',
+        'create_task': '60/hour',
+        'update_task': '120/hour',
+        'comments': '300/day',
+        'analytics': '200/day',
+        'uploads': '50/day',
     },
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10
@@ -169,10 +242,11 @@ REST_FRAMEWORK = {
 
 # JWT Settings
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=int(os.environ.get('JWT_EXPIRATION_DELTA', 60))),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=int(os.environ.get('JWT_REFRESH_EXPIRATION_DELTA', 7))),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
+    'SIGNING_KEY': os.environ.get('JWT_SECRET_KEY', SECRET_KEY),
 }
 
 # Djoser settings
@@ -185,10 +259,7 @@ DJOSER = {
 }
 
 # CORS settings
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-]
+CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',')
 
 # Channels configuration
 ASGI_APPLICATION = 'projectmanagement.asgi.application'
@@ -196,18 +267,26 @@ CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [('127.0.0.1', 6379)],
+            "hosts": [(os.environ.get('REDIS_HOST', '127.0.0.1'), int(os.environ.get('REDIS_PORT', 6379)))],
         },
     },
 }
 
 # Celery Settings
-CELERY_BROKER_URL = 'redis://localhost:6379/0'
-CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+
+# Email settings
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 
 # Media files
 MEDIA_URL = '/media/'

@@ -1,7 +1,6 @@
 from django.db import models
 from users.models import User
 from organizations.models import Organization
-from projects.models import Project
 from tasks.models import Task
 from django.utils import timezone
 from django.db.models import Count, Q
@@ -9,68 +8,73 @@ from django.db.models import Count, Q
 class ActivityLog(models.Model):
     """Activity log model for audit trails"""
     # Action types
-    CREATED = 'created'
-    UPDATED = 'updated'
-    DELETED = 'deleted'
-    ASSIGNED = 'assigned'
-    MOVED = 'moved'
-    COMMENTED = 'commented'
-    
-    ACTION_TYPES = [
-        (CREATED, 'Created'),
-        (UPDATED, 'Updated'),
-        (DELETED, 'Deleted'),
-        (ASSIGNED, 'Assigned'),
-        (MOVED, 'Moved'),
-        (COMMENTED, 'Commented'),
-    ]
+    CREATE = 'create'
+    UPDATE = 'update'
+    DELETE = 'delete'
+    ASSIGN = 'assign'
+    UNASSIGN = 'unassign'
+    MOVE = 'move'
+    COMMENT = 'comment'
+    LOGIN = 'login'
+    LOGOUT = 'logout'
     
     # Entity types
-    TASK = 'task'
+    USER = 'user'
+    ORGANIZATION = 'organization'
     PROJECT = 'project'
     BOARD = 'board'
     COLUMN = 'column'
+    TASK = 'task'
     COMMENT = 'comment'
-    USER = 'user'
-    ORGANIZATION = 'organization'
+    LABEL = 'label'
+    
+    ACTION_TYPES = [
+        (CREATE, 'Create'),
+        (UPDATE, 'Update'),
+        (DELETE, 'Delete'),
+        (ASSIGN, 'Assign'),
+        (UNASSIGN, 'Unassign'),
+        (MOVE, 'Move'),
+        (COMMENT, 'Comment'),
+        (LOGIN, 'Login'),
+        (LOGOUT, 'Logout'),
+    ]
     
     ENTITY_TYPES = [
-        (TASK, 'Task'),
+        (USER, 'User'),
+        (ORGANIZATION, 'Organization'),
         (PROJECT, 'Project'),
         (BOARD, 'Board'),
         (COLUMN, 'Column'),
+        (TASK, 'Task'),
         (COMMENT, 'Comment'),
-        (USER, 'User'),
-        (ORGANIZATION, 'Organization'),
+        (LABEL, 'Label'),
     ]
     
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='activities')
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='activities')
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, null=True, blank=True, related_name='activities')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='analytics_user_activities')
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, null=True, blank=True, related_name='activities')
+    project = models.ForeignKey('projects.Project', on_delete=models.CASCADE, null=True, blank=True, related_name='activities')
     action_type = models.CharField(max_length=20, choices=ACTION_TYPES)
     entity_type = models.CharField(max_length=20, choices=ENTITY_TYPES)
     entity_id = models.PositiveIntegerField()
-    entity_name = models.CharField(max_length=255)
-    description = models.TextField()
-    metadata = models.JSONField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    ip_address = models.GenericIPAddressField(null=True, blank=True)
-    user_agent = models.TextField(null=True, blank=True)
+    entity_name = models.CharField(max_length=255, blank=True, null=True)
+    details = models.JSONField(blank=True, null=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
     
     class Meta:
-        ordering = ['-created_at']
+        ordering = ['-timestamp']
         
     def __str__(self):
-        return f"{self.user.email if self.user else 'System'} {self.get_action_type_display()} {self.get_entity_type_display()} '{self.entity_name}'"
+        return f"{self.user.username} {self.action_type} {self.entity_type} at {self.timestamp}"
 
 class ProjectMetric(models.Model):
     """Project metrics for analytics"""
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='metrics')
+    project = models.ForeignKey('projects.Project', on_delete=models.CASCADE, related_name='metrics')
     date = models.DateField()
-    tasks_created = models.PositiveIntegerField(default=0)
+    tasks_total = models.PositiveIntegerField(default=0)
     tasks_completed = models.PositiveIntegerField(default=0)
+    tasks_in_progress = models.PositiveIntegerField(default=0)
     tasks_overdue = models.PositiveIntegerField(default=0)
-    total_tasks = models.PositiveIntegerField(default=0)
     active_users = models.PositiveIntegerField(default=0)
     
     class Meta:
@@ -83,48 +87,48 @@ class ProjectMetric(models.Model):
     @classmethod
     def update_metrics_for_project(cls, project, date=None):
         """Update or create metrics for a project for a specific date"""
-        if not date:
+        if date is None:
             date = timezone.now().date()
-            
-        # Get metrics data
-        today_start = timezone.make_aware(timezone.datetime.combine(date, timezone.datetime.min.time()))
-        today_end = timezone.make_aware(timezone.datetime.combine(date, timezone.datetime.max.time()))
         
-        tasks_created = Task.objects.filter(
+        # Calculate metrics
+        tasks_total = Task.objects.filter(column__board__project=project).count()
+        
+        # Tasks in progress (not in first or last column)
+        tasks_in_progress = Task.objects.filter(
             column__board__project=project, 
-            created_at__range=(today_start, today_end)
+            column__order__gt=0, 
+        ).exclude(
+            column=project.boards.first().columns.last()
         ).count()
         
-        # Assuming tasks in the last column are considered completed
+        # Find the last column which is typically "Done" or "Completed"
         completed_column = project.boards.first().columns.last()
-        tasks_completed = Task.objects.filter(
-            column=completed_column,
-            updated_at__range=(today_start, today_end)
-        ).count()
+        tasks_completed = Task.objects.filter(column=completed_column).count()
         
+        # Tasks overdue
         tasks_overdue = Task.objects.filter(
             column__board__project=project,
-            due_date__lt=today_end,
-            column__name__iexact='Complete'
+            due_date__lt=timezone.now().date(),
+        ).exclude(
+            column=completed_column
         ).count()
         
-        total_tasks = Task.objects.filter(column__board__project=project).count()
-        
-        # Count active users who performed any activity in the project today
+        # Active users (users with activity in the last 7 days)
+        seven_days_ago = timezone.now() - timezone.timedelta(days=7)
         active_users = ActivityLog.objects.filter(
             project=project,
-            created_at__range=(today_start, today_end)
+            timestamp__gte=seven_days_ago
         ).values('user').distinct().count()
         
-        # Update or create the metrics
+        # Update or create metrics record
         metric, created = cls.objects.update_or_create(
             project=project,
             date=date,
             defaults={
-                'tasks_created': tasks_created,
+                'tasks_total': tasks_total,
                 'tasks_completed': tasks_completed,
+                'tasks_in_progress': tasks_in_progress,
                 'tasks_overdue': tasks_overdue,
-                'total_tasks': total_tasks,
                 'active_users': active_users
             }
         )
@@ -133,18 +137,76 @@ class ProjectMetric(models.Model):
 
 class UserProductivity(models.Model):
     """User productivity metrics"""
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='productivity_metrics')
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='user_productivity')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='productivity')
+    project = models.ForeignKey('projects.Project', on_delete=models.CASCADE, related_name='user_productivity')
     date = models.DateField()
-    tasks_created = models.PositiveIntegerField(default=0)
     tasks_completed = models.PositiveIntegerField(default=0)
-    tasks_assigned = models.PositiveIntegerField(default=0)
-    comments_added = models.PositiveIntegerField(default=0)
-    time_tracked = models.PositiveIntegerField(default=0, help_text="Time tracked in minutes")
+    tasks_created = models.PositiveIntegerField(default=0)
+    comments_created = models.PositiveIntegerField(default=0)
+    total_activity = models.PositiveIntegerField(default=0)
     
     class Meta:
         unique_together = ['user', 'project', 'date']
         ordering = ['-date']
         
     def __str__(self):
-        return f"Productivity for {self.user.email} on {self.project.name} - {self.date}"
+        return f"{self.user.username}'s productivity on {self.date} for {self.project.name}"
+    
+    @classmethod
+    def update_for_user_and_project(cls, user, project, date=None):
+        """Update or create productivity metrics for a user on a project"""
+        if date is None:
+            date = timezone.now().date()
+        
+        # Get the completed column
+        completed_column = project.boards.first().columns.last()
+        
+        # Tasks completed today
+        tasks_completed = ActivityLog.objects.filter(
+            user=user,
+            project=project,
+            action_type=ActivityLog.MOVE,
+            entity_type=ActivityLog.TASK,
+            details__contains={'destination_column': completed_column.id},
+            timestamp__date=date
+        ).count()
+        
+        # Tasks created today
+        tasks_created = ActivityLog.objects.filter(
+            user=user,
+            project=project,
+            action_type=ActivityLog.CREATE,
+            entity_type=ActivityLog.TASK,
+            timestamp__date=date
+        ).count()
+        
+        # Comments created today
+        comments_created = ActivityLog.objects.filter(
+            user=user,
+            project=project,
+            action_type=ActivityLog.COMMENT,
+            entity_type=ActivityLog.COMMENT,
+            timestamp__date=date
+        ).count()
+        
+        # Total activity count
+        total_activity = ActivityLog.objects.filter(
+            user=user,
+            project=project,
+            timestamp__date=date
+        ).count()
+        
+        # Update or create productivity record
+        productivity, created = cls.objects.update_or_create(
+            user=user,
+            project=project,
+            date=date,
+            defaults={
+                'tasks_completed': tasks_completed,
+                'tasks_created': tasks_created,
+                'comments_created': comments_created,
+                'total_activity': total_activity
+            }
+        )
+        
+        return productivity
