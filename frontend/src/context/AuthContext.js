@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }) => {
       const refreshToken = localStorage.getItem('refresh_token');
       if (!refreshToken) throw new Error('No refresh token');
 
-      const response = await axios.post('/api/auth/token/refresh/', {
+      const response = await axios.post('/auth/token/refresh/', {
         refresh: refreshToken
       });
 
@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      const response = await axios.post('/api/auth/token/', {
+      const response = await axios.post('/auth/token/', {
         email,
         password
       });
@@ -92,7 +92,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      await axios.post('/api/v1/users/', {
+      await axios.post('/users/', {
         ...userData,
         password_confirm: userData.password
       });
@@ -119,7 +119,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      await axios.post('/api/auth/users/reset_password/', { email });
+      await axios.post('/auth/users/reset_password/', { email });
       return true;
     } catch (err) {
       setError(err.response?.data || 'Password reset request failed');
