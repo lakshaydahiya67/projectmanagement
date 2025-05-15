@@ -1,8 +1,11 @@
 import axios from 'axios';
 
-// Create axios instance with base URL
+// Get the API URL from environment variables or use a default
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
+
+// Create axios instance with base URL from environment
 const api = axios.create({
-  baseURL: '/api'
+  baseURL: API_URL
 });
 
 // Request interceptor for adding auth token
@@ -32,7 +35,8 @@ api.interceptors.response.use(
         const refreshToken = localStorage.getItem('refresh_token');
         if (!refreshToken) throw new Error('No refresh token');
         
-        const response = await axios.post('/api/auth/token/refresh/', {
+        // Fix the token refresh endpoint to match Djoser's URL pattern
+        const response = await axios.post('/auth/jwt/refresh/', {
           refresh: refreshToken
         });
         
@@ -60,9 +64,9 @@ api.interceptors.response.use(
 const apiService = {
   // Auth endpoints
   auth: {
-    login: (email, password) => api.post('/auth/token/', { email, password }),
+    login: (email, password) => api.post('/auth/jwt/create/', { email, password }),
     register: (userData) => api.post('/auth/users/', userData),
-    refreshToken: (refreshToken) => api.post('/auth/token/refresh/', { refresh: refreshToken }),
+    refreshToken: (refreshToken) => api.post('/auth/jwt/refresh/', { refresh: refreshToken }),
     resetPassword: (email) => api.post('/auth/users/reset_password/', { email }),
     confirmReset: (data) => api.post('/auth/users/reset_password_confirm/', data)
   },
@@ -86,7 +90,13 @@ const apiService = {
     update: (id, data) => api.patch(`/projects/${id}/`, data),
     delete: (id) => api.delete(`/projects/${id}/`),
     getMembers: (id) => api.get(`/projects/${id}/members/`),
-    addMember: (id, data) => api.post(`/projects/${id}/members/`, data)
+    addMember: (id, data) => api.post(`/projects/${id}/members/`, data),
+    getStats: (projectId) => {
+      if (projectId) {
+        return api.get(`/analytics/projects/${projectId}/metrics/summary/`);
+      } 
+      return api.get('/analytics/projects/metrics/summary/');
+    }
   },
   
   // Boards
@@ -96,7 +106,9 @@ const apiService = {
     create: (projectId, data) => api.post(`/projects/${projectId}/boards/`, data),
     update: (projectId, boardId, data) => api.patch(`/projects/${projectId}/boards/${boardId}/`, data),
     delete: (projectId, boardId) => api.delete(`/projects/${projectId}/boards/${boardId}/`),
-    getColumns: (projectId, boardId) => api.get(`/projects/${projectId}/boards/${boardId}/columns/`)
+    getColumns: (projectId, boardId) => api.get(`/projects/${projectId}/boards/${boardId}/columns/`),
+    // Fix the recent boards endpoint to use analytics API
+    getRecent: () => api.get('/analytics/boards/recent/')
   },
   
   // Columns
@@ -119,7 +131,9 @@ const apiService = {
     addLabels: (projectId, boardId, columnId, taskId, data) => api.post(`/projects/${projectId}/boards/${boardId}/columns/${columnId}/tasks/${taskId}/add_labels/`, data),
     removeLabels: (projectId, boardId, columnId, taskId, data) => api.post(`/projects/${projectId}/boards/${boardId}/columns/${columnId}/tasks/${taskId}/remove_labels/`, data),
     assign: (projectId, boardId, columnId, taskId, data) => api.post(`/projects/${projectId}/boards/${boardId}/columns/${columnId}/tasks/${taskId}/assign/`, data),
-    filter: (projectId, boardId, columnId, data) => api.post(`/projects/${projectId}/boards/${boardId}/columns/${columnId}/tasks/filter_tasks/`, data)
+    filter: (projectId, boardId, columnId, data) => api.post(`/projects/${projectId}/boards/${boardId}/columns/${columnId}/tasks/filter_tasks/`, data),
+    // Fix the upcoming tasks endpoint to use analytics API
+    getUpcoming: () => api.get('/analytics/tasks/upcoming/')
   },
   
   // Comments

@@ -38,12 +38,29 @@ A Trello/Asana-like project management application with real-time collaboration,
 
 ### Environment Setup
 
-1. Create a `.env` file in the project root using the provided template:
-```
-cp env.example .env
-```
+1. For environment variables, use the provided `abc.txt` file:
+   ```
+   # Copy the example file
+   cp abc.txt .env
+   # Edit the .env file with your specific values
+   nano .env
+   ```
+   
+   Alternatively, run the included setup script:
+   ```
+   ./setup_env.sh
+   ```
 
-2. Customize the environment variables as needed
+### Security Considerations
+
+For production deployment:
+1. Generate a strong Django secret key and JWT signing key
+2. Set `DJANGO_DEBUG=False`
+3. Configure proper `ALLOWED_HOSTS` and CORS settings
+4. Set up proper email configuration
+5. Use HTTPS with SSL/TLS certificates
+6. Consider using a more robust database like PostgreSQL
+7. Make sure Redis is secured behind a firewall or uses authentication
 
 ### Backend Setup
 

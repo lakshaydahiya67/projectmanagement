@@ -4,6 +4,8 @@ from django.utils.translation import gettext_lazy as _
 from django.core.validators import RegexValidator
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from django.conf import settings
+import os
 import uuid
 
 def validate_image_size(image):
@@ -13,12 +15,18 @@ def validate_image_size(image):
     if file_size > limit_mb * 1024 * 1024:
         raise ValidationError(f"Max size of file is {limit_mb} MB")
 
+def user_profile_picture_path(instance, filename):
+    """Generate a unique path for user profile pictures"""
+    ext = filename.split('.')[-1]
+    filename = f"{uuid.uuid4()}.{ext}"
+    return os.path.join('profile_pictures', filename)
+
 class User(AbstractUser):
     """Custom user model that extends Django's AbstractUser"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(_('email address'), unique=True)
     profile_picture = models.ImageField(
-        upload_to='profile_pictures/', 
+        upload_to=user_profile_picture_path, 
         null=True, 
         blank=True,
         validators=[validate_image_size]
@@ -50,6 +58,12 @@ class User(AbstractUser):
         # Ensure email is lowercase for consistency
         if self.email:
             self.email = self.email.lower()
+    
+    def get_profile_picture_url(self):
+        """Return the complete URL for the profile picture or None if not available"""
+        if self.profile_picture and hasattr(self.profile_picture, 'url'):
+            return self.profile_picture.url
+        return None
 
 class UserPreference(models.Model):
     """User preferences model to store user-specific settings"""

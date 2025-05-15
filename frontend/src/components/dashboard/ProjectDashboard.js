@@ -31,21 +31,62 @@ const ProjectDashboard = () => {
         setIsLoading(true);
         setError(null);
         
-        // Fetch projects
-        const projectsResponse = await apiService.projects.getAll();
-        setProjects(projectsResponse.data);
+        // Fetch projects - this is the minimum required endpoint
+        try {
+          const projectsResponse = await apiService.projects.getAll();
+          // Ensure projects is always an array
+          if (Array.isArray(projectsResponse.data)) {
+            setProjects(projectsResponse.data);
+          } else if (projectsResponse.data && Array.isArray(projectsResponse.data.results)) {
+            setProjects(projectsResponse.data.results);
+          } else if (projectsResponse.data && typeof projectsResponse.data === 'object') {
+            // Try to find any array property that might contain projects
+            const possibleArrays = Object.values(projectsResponse.data).filter(val => Array.isArray(val));
+            if (possibleArrays.length > 0) {
+              setProjects(possibleArrays[0]);
+            } else {
+              console.error('API returned projects in an unexpected format:', projectsResponse.data);
+              setProjects([]);
+            }
+          } else {
+            console.error('API returned projects in an unexpected format:', projectsResponse.data);
+            setProjects([]);
+          }
+        } catch (err) {
+          console.error('Error fetching projects:', err);
+          setError('Failed to load projects. Please try again later.');
+          setProjects([]);
+        }
         
-        // Fetch recent boards
-        const recentBoardsResponse = await apiService.boards.getRecent();
-        setRecentBoards(recentBoardsResponse.data);
+        // Try to fetch recent boards, but don't block the dashboard if it fails
+        try {
+          const recentBoardsResponse = await apiService.boards.getRecent();
+          setRecentBoards(recentBoardsResponse.data || []);
+        } catch (err) {
+          console.error('Error fetching recent boards:', err);
+          // Don't set an error, just use empty array
+          setRecentBoards([]);
+        }
         
-        // Fetch upcoming tasks
-        const upcomingTasksResponse = await apiService.tasks.getUpcoming();
-        setUpcomingTasks(upcomingTasksResponse.data);
+        // Try to fetch upcoming tasks, but don't block the dashboard if it fails
+        try {
+          const upcomingTasksResponse = await apiService.tasks.getUpcoming();
+          setUpcomingTasks(upcomingTasksResponse.data || []);
+        } catch (err) {
+          console.error('Error fetching upcoming tasks:', err);
+          // Don't set an error, just use empty array
+          setUpcomingTasks([]);
+        }
         
-        // Fetch project stats
-        const projectStatsResponse = await apiService.projects.getStats();
-        setProjectStats(projectStatsResponse.data);
+        // Try to fetch project stats, but don't block the dashboard if it fails
+        try {
+          const projectStatsResponse = await apiService.projects.getStats();
+          setProjectStats(projectStatsResponse.data || null);
+        } catch (err) {
+          console.error('Error fetching project stats:', err);
+          // Don't set an error, just use null
+          setProjectStats(null);
+        }
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
         setError('Failed to load dashboard data. Please try again later.');
@@ -57,11 +98,11 @@ const ProjectDashboard = () => {
     fetchDashboardData();
   }, []);
   
-  // Filter projects based on search term
-  const filteredProjects = projects.filter(project =>
+  // Filter projects based on search term - ensure projects is an array before filtering
+  const filteredProjects = Array.isArray(projects) ? projects.filter(project =>
     project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     project.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) : [];
   
   // Handle project creation
   const handleCreateProject = async (projectData) => {
@@ -78,6 +119,7 @@ const ProjectDashboard = () => {
   
   // Format date for display
   const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
@@ -141,7 +183,7 @@ const ProjectDashboard = () => {
                     Total Projects
                   </dt>
                   <dd className="mt-1 text-3xl font-semibold text-gray-900 dark:text-white">
-                    {projectStats.total_projects}
+                    {projectStats.total_projects || projects.length}
                   </dd>
                 </div>
               </div>
@@ -159,7 +201,7 @@ const ProjectDashboard = () => {
                     Active Team Members
                   </dt>
                   <dd className="mt-1 text-3xl font-semibold text-gray-900 dark:text-white">
-                    {projectStats.active_members}
+                    {projectStats.active_members || 0}
                   </dd>
                 </div>
               </div>
@@ -177,7 +219,7 @@ const ProjectDashboard = () => {
                     Tasks Completed
                   </dt>
                   <dd className="mt-1 text-3xl font-semibold text-gray-900 dark:text-white">
-                    {projectStats.completed_tasks}
+                    {projectStats.completed_tasks || 0}
                   </dd>
                 </div>
               </div>
@@ -195,7 +237,7 @@ const ProjectDashboard = () => {
                     Upcoming Tasks
                   </dt>
                   <dd className="mt-1 text-3xl font-semibold text-gray-900 dark:text-white">
-                    {projectStats.upcoming_tasks}
+                    {projectStats.upcoming_tasks || upcomingTasks.length || 0}
                   </dd>
                 </div>
               </div>
@@ -278,11 +320,11 @@ const ProjectDashboard = () => {
               </ul>
             </div>
           ) : (
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 text-center">
-              <p className="text-gray-500 dark:text-gray-400">
-                No boards visited yet.
-              </p>
-            </div>
+            <EmptyState 
+              icon={<FolderIcon className="h-12 w-12" />}
+              title="No recent boards"
+              description="You haven't visited any boards recently."
+            />
           )}
         </div>
         
@@ -295,36 +337,36 @@ const ProjectDashboard = () => {
                 {upcomingTasks.map((task) => (
                   <li key={task.id}>
                     <Link 
-                      to={`/projects/${task.project_id}/boards/${task.board_id}/columns/${task.column_id}/tasks/${task.id}`}
+                      to={`/projects/${task.project.id}/boards/${task.board.id}?task=${task.id}`}
                       className="block hover:bg-gray-50 dark:hover:bg-gray-700"
                     >
                       <div className="px-4 py-4 sm:px-6">
                         <div className="flex items-center justify-between">
-                          <div className="truncate">
-                            <div className="flex items-center">
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                  task.priority === 'high' || task.priority === 'urgent'
-                                    ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                    : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                }`}
-                              >
-                                {task.priority}
+                          <div className="flex items-center">
+                            <div className={`flex-shrink-0 h-10 w-10 ${
+                              task.priority === 'HIGH' ? 'bg-red-100 dark:bg-red-900' :
+                              task.priority === 'MEDIUM' ? 'bg-yellow-100 dark:bg-yellow-900' :
+                              'bg-green-100 dark:bg-green-900'
+                            } rounded-md flex items-center justify-center`}>
+                              <span className={`${
+                                task.priority === 'HIGH' ? 'text-red-600 dark:text-red-200' :
+                                task.priority === 'MEDIUM' ? 'text-yellow-600 dark:text-yellow-200' :
+                                'text-green-600 dark:text-green-200'
+                              } font-medium`}>
+                                {task.priority.substring(0, 1)}
                               </span>
-                              <div className="ml-2 text-sm font-medium text-gray-900 dark:text-white truncate">
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900 dark:text-white">
                                 {task.title}
                               </div>
-                            </div>
-                            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400 flex">
-                              <span>{task.project_name}</span>
-                              <span className="mx-1">•</span>
-                              <span>{task.board_name}</span>
+                              <div className="text-sm text-gray-500 dark:text-gray-400">
+                                {task.board?.name}
+                              </div>
                             </div>
                           </div>
-                          <div className="ml-2 flex-shrink-0 flex">
-                            <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                              Due {formatDate(task.due_date)}
-                            </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            Due {formatDate(task.due_date)}
                           </div>
                         </div>
                       </div>
@@ -334,11 +376,11 @@ const ProjectDashboard = () => {
               </ul>
             </div>
           ) : (
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 text-center">
-              <p className="text-gray-500 dark:text-gray-400">
-                No upcoming tasks.
-              </p>
-            </div>
+            <EmptyState 
+              icon={<ClockIcon className="h-12 w-12" />}
+              title="No upcoming tasks"
+              description="You don't have any upcoming tasks due soon."
+            />
           )}
         </div>
       </div>

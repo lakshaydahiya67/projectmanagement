@@ -27,8 +27,8 @@ def create_user_preferences(sender, instance, created, **kwargs):
                 user=instance,  # The user who performed the action (themselves in this case)
                 content_type=ContentType.objects.get_for_model(instance),
                 object_id=str(instance.id),
-                action=ActivityLog.CREATE,
-                details=f"User account for {instance.email} was created"
+                action_type=ActivityLog.CREATED,
+                description=f"User account for {instance.email} was created"
             )
 
 @receiver(post_save, sender=UserPreference)
@@ -41,6 +41,6 @@ def log_preference_update(sender, instance, created, **kwargs):
             user=instance.user,
             content_type=ContentType.objects.get_for_model(instance.user),
             object_id=str(instance.user.id),
-            action=ActivityLog.UPDATE,
-            details=f"User preferences updated"
+            action_type=ActivityLog.UPDATED,
+            description=f"User preferences updated"
         ) 

@@ -1,9 +1,12 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useContext } from 'react';
+import ReconnectingWebSocket from 'reconnecting-websocket';
+import { AuthContext } from '../context/AuthContext';
 
 export const useWebSocket = (url, onMessage) => {
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState(null);
+  const { refreshToken } = useContext(AuthContext);
 
   // Function to send messages
   const sendMessage = useCallback((data) => {
@@ -18,9 +21,31 @@ export const useWebSocket = (url, onMessage) => {
   useEffect(() => {
     let ws = null;
     let heartbeatInterval = null;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
 
-    const setupSocket = () => {
-      const token = localStorage.getItem('access_token');
+    const setupSocket = async () => {
+      try {
+        // Get a fresh token before connecting
+        let token = localStorage.getItem('access_token');
+        
+        // If token looks expired based on JWT structure (check exp field)
+        if (token) {
+          const tokenParts = token.split('.');
+          if (tokenParts.length === 3) {
+            const payload = JSON.parse(atob(tokenParts[1]));
+            const expiration = payload.exp * 1000; // Convert to milliseconds
+            
+            // Get token expiry threshold from env or default to 5 minutes
+            const expiryThresholdMins = parseInt(process.env.REACT_APP_TOKEN_EXPIRY_THRESHOLD_MINS || '5');
+            
+            // If token is expired or about to expire
+            if (Date.now() >= expiration - expiryThresholdMins * 60 * 1000) {
+              token = await refreshToken();
+            }
+          }
+        }
+        
       if (!token) {
         setError('Authentication token not found');
         return;
@@ -28,11 +53,20 @@ export const useWebSocket = (url, onMessage) => {
 
       // Include token in the URL for authentication
       const socketUrl = `${url}?token=${token}`;
-      ws = new WebSocket(socketUrl);
+        
+        // Use ReconnectingWebSocket instead of regular WebSocket
+        ws = new ReconnectingWebSocket(socketUrl, [], {
+          connectionTimeout: 10000,
+          maxRetries: 10,
+          minReconnectionDelay: 1000,
+          maxReconnectionDelay: 30000,
+          reconnectionDelayGrowFactor: 1.3,
+        });
 
       ws.onopen = () => {
         setIsConnected(true);
         setError(null);
+          reconnectAttempts = 0;
         console.log('WebSocket connection established');
         
         // Setup heartbeat to keep connection alive
@@ -57,25 +91,37 @@ export const useWebSocket = (url, onMessage) => {
         setError('WebSocket connection error');
       };
 
-      ws.onclose = (event) => {
+        ws.onclose = async (event) => {
         setIsConnected(false);
         console.log('WebSocket connection closed:', event.code, event.reason);
         
         // Clear heartbeat interval
         if (heartbeatInterval) {
           clearInterval(heartbeatInterval);
+            heartbeatInterval = null;
         }
         
-        // Attempt to reconnect after delay unless it was a clean close
-        if (event.code !== 1000) {
-          setTimeout(() => {
-            console.log('Attempting to reconnect WebSocket...');
-            setupSocket();
-          }, 5000); // Wait 5 seconds before reconnecting
+          // Token might be expired
+          if (event.code === 1006 || event.code === 1011) {
+            reconnectAttempts++;
+            
+            // Try refreshing token if it seems like an authentication issue
+            if (reconnectAttempts <= maxReconnectAttempts) {
+              try {
+                await refreshToken();
+                // Allow reconnection logic in ReconnectingWebSocket to handle it
+              } catch (err) {
+                console.error('Failed to refresh token:', err);
+              }
+            }
         }
       };
 
       setSocket(ws);
+      } catch (err) {
+        console.error('Error setting up WebSocket:', err);
+        setError(`WebSocket setup error: ${err.message}`);
+      }
     };
 
     setupSocket();
@@ -91,23 +137,40 @@ export const useWebSocket = (url, onMessage) => {
         ws.close(1000, 'Component unmounted');
       }
     };
-  }, [url, onMessage]);
+  }, [url, onMessage, refreshToken]);
 
   return { isConnected, error, sendMessage };
 };
 
+// Dynamically determine WebSocket base URL using environment variables
+const getWebSocketBaseUrl = () => {
+  // Use environment variable if available, otherwise calculate from window location
+  if (process.env.REACT_APP_WEBSOCKET_URL) {
+    return process.env.REACT_APP_WEBSOCKET_URL;
+  }
+  
+  // Fallback to dynamic calculation
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const hostname = window.location.hostname;
+  const port = hostname === 'localhost' || hostname === '127.0.0.1' ? '8000' : window.location.port;
+  return `${wsProtocol}//${hostname}:${port}`;
+};
+
 // Specialized hooks for different WebSocket connections
 export const useBoardWebSocket = (boardId, onMessage) => {
-  const wsUrl = `ws://${window.location.host}/ws/boards/${boardId}/`;
+  const wsBaseUrl = getWebSocketBaseUrl();
+  const wsUrl = `${wsBaseUrl}/boards/${boardId}/`;
   return useWebSocket(wsUrl, onMessage);
 };
 
 export const useProjectWebSocket = (projectId, onMessage) => {
-  const wsUrl = `ws://${window.location.host}/ws/projects/${projectId}/`;
+  const wsBaseUrl = getWebSocketBaseUrl();
+  const wsUrl = `${wsBaseUrl}/projects/${projectId}/`;
   return useWebSocket(wsUrl, onMessage);
 };
 
 export const useNotificationWebSocket = (onMessage) => {
-  const wsUrl = `ws://${window.location.host}/ws/notifications/`;
+  const wsBaseUrl = getWebSocketBaseUrl();
+  const wsUrl = `${wsBaseUrl}/notifications/`;
   return useWebSocket(wsUrl, onMessage);
 };

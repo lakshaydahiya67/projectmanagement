@@ -14,6 +14,7 @@ const Register = () => {
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
   
   const { register } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -41,7 +42,7 @@ const Register = () => {
     
     return true;
   };
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -51,22 +52,64 @@ const Register = () => {
       setError('');
       setIsLoading(true);
       
-      await register({
+      // Format the data as expected by the AuthContext register function
+      // Using the proper field names that match the backend expectations
+      const userData = {
         email: formData.email,
         username: formData.username,
         password: formData.password,
+        password_confirm: formData.confirmPassword, 
+        re_password: formData.confirmPassword, // Djoser expects this field
         first_name: formData.firstName,
         last_name: formData.lastName
+      };
+      
+      console.log('Submitting registration form with data:', {
+        ...userData,
+        password: '********',
+        password_confirm: '********',
+        re_password: '********'
       });
       
-      navigate('/login', { state: { message: 'Registration successful. Please log in.' } });
+      // Call register function
+      await register(userData);
+      
+      // Show success message
+      setSuccess(true);
+      setIsLoading(false);
+      
+      // Navigate after a short delay to allow the user to see the success message
+      setTimeout(() => {
+        navigate('/login', { state: { message: 'Registration successful. Please check your email for activation instructions.' } });
+      }, 2000);
     } catch (err) {
       console.error('Registration error:', err);
-      setError(
-        err.response?.data?.detail || 
-        Object.values(err.response?.data || {}).flat().join(', ') ||
-        'Registration failed. Please try again.'
-      );
+      
+      // Detailed error handling
+      let errorMessage = 'Registration failed. Please try again.';
+      
+      if (err.response) {
+        // If we have a response, use it for error details
+        if (err.response.data) {
+          if (typeof err.response.data === 'object') {
+            // Format response data object into readable message
+            errorMessage = Object.entries(err.response.data)
+              .map(([key, value]) => {
+                const errorValue = Array.isArray(value) ? value.join(', ') : value;
+                return `${key}: ${errorValue}`;
+              })
+              .join('; ');
+          } else if (typeof err.response.data === 'string') {
+            errorMessage = err.response.data;
+          }
+        } else {
+          errorMessage = `Registration failed with status: ${err.response.status}`;
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
       setIsLoading(false);
     }
   };
@@ -84,6 +127,12 @@ const Register = () => {
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
               <span>{error}</span>
+            </div>
+          )}
+          
+          {success && (
+            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+              <span>Registration successful! Redirecting to login...</span>
             </div>
           )}
           
@@ -194,7 +243,7 @@ const Register = () => {
             <div>
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || success}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
               >
                 {isLoading ? (
@@ -220,25 +269,11 @@ const Register = () => {
               </button>
             </div>
           </form>
-          
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">
-                  Already have an account?
-                </span>
-              </div>
-            </div>
-            
-            <div className="mt-6">
-              <Link
-                to="/login"
-                className="w-full flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
-              >
-                Sign in
+
+          <div className="mt-6 flex items-center justify-center">
+            <div className="text-sm">
+              <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
+                Already have an account? Sign in
               </Link>
             </div>
           </div>

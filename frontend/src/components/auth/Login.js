@@ -16,6 +16,9 @@ const Login = () => {
   // Get the redirect path from location state or default to dashboard
   const from = location.state?.from?.pathname || '/dashboard';
   
+  // Display success message if available
+  const message = location.state?.message || '';
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email || !password) {
@@ -48,6 +51,12 @@ const Login = () => {
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
               <span>{error}</span>
+            </div>
+          )}
+          
+          {message && (
+            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+              <span>{message}</span>
             </div>
           )}
           
@@ -104,9 +113,9 @@ const Login = () => {
               </div>
 
               <div className="text-sm">
-                <a href="#" className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400">
+                <Link to="/forgot-password" className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400">
                   Forgot your password?
-                </a>
+                </Link>
               </div>
             </div>
 

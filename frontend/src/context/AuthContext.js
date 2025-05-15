@@ -1,5 +1,5 @@
-import { createContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import { createContext, useState, useEffect, useCallback } from 'react';
+import axios from '../utils/axios';
 import jwt_decode from 'jwt-decode';
 import { useNavigate } from 'react-router-dom';
 
@@ -11,11 +11,8 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    checkUserLoggedIn();
-  }, []);
-
-  const checkUserLoggedIn = async () => {
+  // Use useCallback to fix the dependency warning
+  const checkUserLoggedIn = useCallback(async () => {
     try {
       const token = localStorage.getItem('access_token');
       if (token) {
@@ -36,14 +33,18 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    checkUserLoggedIn();
+  }, [checkUserLoggedIn]);
 
   const refreshToken = async () => {
     try {
       const refreshToken = localStorage.getItem('refresh_token');
       if (!refreshToken) throw new Error('No refresh token');
 
-      const response = await axios.post('/auth/token/refresh/', {
+      const response = await axios.post('/auth/jwt/refresh/', {
         refresh: refreshToken
       });
 
@@ -67,7 +68,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      const response = await axios.post('/auth/token/', {
+      const response = await axios.post('/auth/jwt/create/', {
         email,
         password
       });
@@ -92,15 +93,74 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      await axios.post('/users/', {
-        ...userData,
-        password_confirm: userData.password
+      // Create specific instance for registration request with explicit CORS settings
+      const registerAxios = axios.create({
+        baseURL: 'http://localhost:8000/api/v1',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        withCredentials: false
       });
       
-      // After registration, login the user
-      return login(userData.email, userData.password);
+      // Format data according to backend expectations
+      const formattedData = {
+        username: userData.username,
+        email: userData.email,
+        password: userData.password,
+        re_password: userData.password_confirm || userData.password, // Djoser uses re_password
+        first_name: userData.first_name || '',
+        last_name: userData.last_name || ''
+      };
+      
+      // Debug logging
+      console.log('Sending registration request to:', '/auth/users/');
+      console.log('Registration data:', formattedData);
+      
+      // Use auth/users/ endpoint which is provided by djoser
+      const response = await registerAxios.post('/auth/users/', formattedData);
+      
+      console.log('Registration successful:', response.data);
+      
+      // Return the response, but don't auto-login since some setups require email verification
+      return response.data;
     } catch (err) {
-      setError(err.response?.data || 'Registration failed');
+      console.error('Registration error:', err);
+      
+      if (process.env.NODE_ENV !== 'production') {
+        // In development, log the full error details
+        console.error('Error details:', {
+          message: err.message,
+          response: err.response?.data,
+          status: err.response?.status,
+          headers: err.response?.headers,
+          request: {
+            url: err.config?.url,
+            method: err.config?.method,
+            data: err.config?.data,
+            headers: err.config?.headers
+          }
+        });
+      }
+      
+      // Extract detailed error messages from response
+      let errorMessage = 'Registration failed';
+      
+      if (err.response?.data) {
+        // Format error messages from different possible formats
+        if (typeof err.response.data === 'object') {
+          errorMessage = Object.entries(err.response.data)
+            .map(([key, value]) => {
+              // Handle array or string value
+              const errorValue = Array.isArray(value) ? value.join(', ') : value;
+              return `${key}: ${errorValue}`;
+            })
+            .join('; ');
+        } else if (typeof err.response.data === 'string') {
+          errorMessage = err.response.data;
+        }
+      }
+      
+      setError(errorMessage);
       throw err;
     } finally {
       setLoading(false);
@@ -138,7 +198,8 @@ export const AuthProvider = ({ children }) => {
       register,
       logout,
       refreshToken,
-      resetPassword
+      resetPassword,
+      isAuthenticated: !!user
     }}>
       {children}
     </AuthContext.Provider>

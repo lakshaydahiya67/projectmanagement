@@ -17,7 +17,7 @@ class ProjectConsumer(AsyncWebsocketConsumer):
         
         # Check if user has access to this project
         if not await self.user_has_project_access():
-            await self.close()
+            await self.close(code=4003)  # 4003 = Authentication failed
             return
         
         # Join the project group
@@ -61,29 +61,35 @@ class ProjectConsumer(AsyncWebsocketConsumer):
         Receive message from WebSocket.
         Parse the message and perform actions based on the message type.
         """
-        data = json.loads(text_data)
-        message_type = data.get('type')
-        
-        if message_type == 'task_update':
-            await self.channel_layer.group_send(
-                self.project_group_name,
-                {
-                    'type': 'task_update_message',
-                    'task_id': data.get('task_id'),
-                    'updates': data.get('updates'),
-                    'user': await self.get_user_data()
-                }
-            )
-        elif message_type == 'comment_add':
-            await self.channel_layer.group_send(
-                self.project_group_name,
-                {
-                    'type': 'comment_add_message',
-                    'task_id': data.get('task_id'),
-                    'comment': data.get('comment'),
-                    'user': await self.get_user_data()
-                }
-            )
+        try:
+            data = json.loads(text_data)
+            message_type = data.get('type')
+            
+            if message_type == 'task_update':
+                await self.channel_layer.group_send(
+                    self.project_group_name,
+                    {
+                        'type': 'task_update_message',
+                        'task_id': data.get('task_id'),
+                        'updates': data.get('updates'),
+                        'user': await self.get_user_data()
+                    }
+                )
+            elif message_type == 'comment_add':
+                await self.channel_layer.group_send(
+                    self.project_group_name,
+                    {
+                        'type': 'comment_add_message',
+                        'task_id': data.get('task_id'),
+                        'comment': data.get('comment'),
+                        'user': await self.get_user_data()
+                    }
+                )
+            elif message_type == 'heartbeat':
+                # Just acknowledge heartbeat
+                pass
+        except json.JSONDecodeError:
+            pass
     
     async def task_update_message(self, event):
         """Send task update message to WebSocket"""
@@ -153,10 +159,10 @@ class ProjectConsumer(AsyncWebsocketConsumer):
         """Get user data to send in messages"""
         user = self.scope['user']
         return {
-            'id': user.id,
+            'id': str(user.id),  # Convert UUID to string
             'username': user.username,
             'full_name': user.get_full_name(),
-            'avatar': user.profile_picture.url if user.profile_picture else None
+            'avatar': user.get_profile_picture_url() if hasattr(user, 'get_profile_picture_url') else (user.profile_picture.url if user.profile_picture else None)
         }
 
 
@@ -169,7 +175,7 @@ class BoardConsumer(AsyncWebsocketConsumer):
         
         # Check if user has access to this board
         if not await self.user_has_board_access():
-            await self.close()
+            await self.close(code=4003)  # 4003 = Authentication failed
             return
         
         # Join the board group
@@ -338,10 +344,10 @@ class BoardConsumer(AsyncWebsocketConsumer):
         """Get user data to send in messages"""
         user = self.scope['user']
         return {
-            'id': user.id,
+            'id': str(user.id),  # Convert UUID to string
             'username': user.username,
             'full_name': user.get_full_name(),
-            'avatar': user.profile_picture.url if user.profile_picture else None
+            'avatar': user.get_profile_picture_url() if hasattr(user, 'get_profile_picture_url') else (user.profile_picture.url if user.profile_picture else None)
         }
     
     @database_sync_to_async
@@ -364,10 +370,10 @@ class BoardConsumer(AsyncWebsocketConsumer):
         # Format viewer data for the frontend
         return [
             {
-                'id': viewer.user.id,
+                'id': str(viewer.user.id),  # Convert UUID to string
                 'username': viewer.user.username,
                 'full_name': viewer.user.get_full_name(),
-                'avatar': viewer.user.profile_picture.url if viewer.user.profile_picture else None,
+                'avatar': viewer.user.get_profile_picture_url() if hasattr(viewer.user, 'get_profile_picture_url') else (viewer.user.profile_picture.url if viewer.user.profile_picture else None),
                 'joined_at': viewer.joined_at.isoformat()
             } for viewer in viewers
         ]
