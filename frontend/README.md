@@ -1,70 +1,154 @@
-# Getting Started with Create React App
+# Project Management Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+This is the React frontend for the Project Management application, providing a user-friendly interface for managing projects, tasks, and collaboration.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+- **Project Dashboard**: Overview of all projects and key metrics
+- **Task Board**: Kanban-style board with drag-and-drop functionality
+- **Real-time Collaboration**: WebSocket integration for live updates
+- **User Management**: Profile settings and preferences
+- **Notifications**: In-app notification system
+- **Analytics**: Visual charts and reports
+- **Responsive Design**: Works on desktop and mobile
+- **Dark Mode**: Customizable theme preferences
 
-### `npm start`
+## Technology Stack
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- React 18.2.0
+- React Router 6
+- Redux for state management
+- Tailwind CSS for styling
+- Chart.js for data visualization
+- React Beautiful DND for drag-and-drop
+- Axios for API communication
+- Socket.io for WebSocket communication
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Prerequisites
 
-### `npm test`
+- Node.js 16+
+- NPM 8+
+- Backend API running (see main project README)
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Getting Started
 
-### `npm run build`
+### Installation
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+1. Clone the repository (if not already done)
+2. Navigate to the frontend directory:
+   ```bash
+   cd projectmanagement/frontend
+   ```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+3. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+4. Setup environment:
+   ```bash
+   cp .env-example .env
+   ```
+   
+   Edit the `.env` file to set your environment variables:
+   - `REACT_APP_API_URL`: URL of the backend API
+   - `REACT_APP_WEBSOCKET_URL`: URL for WebSocket connection
+   - Other settings as needed
 
-### `npm run eject`
+### Development
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Run the development server:
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```bash
+npm start
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+The application will be available at http://localhost:3000.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### Building for Production
 
-## Learn More
+```bash
+npm run build
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+This creates a `build` directory with optimized production files.
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Project Structure
 
-### Code Splitting
+```
+frontend/
+├── public/              # Static assets
+├── src/
+│   ├── api/             # API client functions
+│   ├── components/      # Reusable UI components
+│   │   ├── common/      # Generic components
+│   │   ├── dashboard/   # Dashboard components
+│   │   ├── projects/    # Project-related components
+│   │   └── tasks/       # Task-related components
+│   ├── context/         # React contexts
+│   ├── hooks/           # Custom hooks
+│   ├── pages/           # Page components
+│   ├── reducers/        # Redux reducers
+│   ├── services/        # Service functions
+│   ├── styles/          # CSS and style files
+│   ├── utils/           # Utility functions
+│   ├── App.js           # Main app component
+│   └── index.js         # Entry point
+└── package.json         # Dependencies and scripts
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## Key Components
 
-### Analyzing the Bundle Size
+### Authentication
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+Authentication is handled using JWT tokens stored in browser localStorage. Login and registration are managed through the authentication API endpoints.
 
-### Making a Progressive Web App
+### WebSocket Integration
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+Real-time updates are implemented using WebSockets. The connection is established in the WebSocketProvider component and manages events like task updates, comments, and notifications.
 
-### Advanced Configuration
+### State Management
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+Application state is managed with Redux, with actions and reducers organized by feature domain (projects, tasks, users, etc.).
 
-### Deployment
+## Testing
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+Run tests with:
 
-### `npm run build` fails to minify
+```bash
+npm test
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+For coverage report:
+
+```bash
+npm test -- --coverage
+```
+
+## Linting and Formatting
+
+Run ESLint:
+
+```bash
+npm run lint
+```
+
+Fix ESLint issues:
+
+```bash
+npm run lint:fix
+```
+
+Format code with Prettier:
+
+```bash
+npm run format
+```
+
+## Contributing
+
+Please see the [Contributing Guide](../docs/CONTRIBUTING.md) for details on how to contribute to the project.
+
+## Troubleshooting
+
+For common issues and solutions, see the [Troubleshooting Guide](../docs/TROUBLESHOOTING.md).

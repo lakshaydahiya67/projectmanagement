@@ -2,7 +2,20 @@
 
 A Trello/Asana-like project management application with real-time collaboration, task management, and analytics capabilities.
 
-## Features
+## 📑 Documentation
+
+This project's documentation is organized into the following sections:
+
+- **[Installation Guide](docs/INSTALLATION.md)** - Setup instructions for development and production
+- **[Docker Guide](docs/DOCKER.md)** - Running the application with Docker
+- **[Configuration Guide](docs/CONFIGURATION.md)** - Environment variables and configuration options
+- **[API Documentation](docs/API.md)** - API endpoint reference and examples
+- **[Development Guide](docs/DEVELOPMENT.md)** - Development workflow and best practices
+- **[Architecture Overview](docs/ARCHITECTURE.md)** - System architecture and component interactions
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+- **[Contributing Guide](docs/CONTRIBUTING.md)** - How to contribute to this project
+
+## 🚀 Features
 
 - **Multi-tenant Architecture**: Organizations, projects, and user management
 - **Task Management**: Kanban-style boards with cards and columns
@@ -13,7 +26,7 @@ A Trello/Asana-like project management application with real-time collaboration,
 - **Role-based Access Control**: Admin, Manager, and Member roles
 - **Responsive UI**: Works on desktop and mobile with dark mode support
 
-## Tech Stack
+## 🛠️ Tech Stack
 
 ### Backend
 - Django 4.2.11
@@ -29,142 +42,55 @@ A Trello/Asana-like project management application with real-time collaboration,
 - Chart.js for data visualization
 - React Beautiful DND for drag-and-drop
 
-## Setup Instructions
+## 🏗️ Project Architecture
 
-### Prerequisites
-- Python 3.8+
-- Node.js 16+
-- Redis server (for WebSockets and Celery)
-
-### Environment Setup
-
-1. For environment variables, use the provided `env-example` files:
-   ```
-   # Copy the backend example file
-   cp env-example .env
-   
-   # Copy the frontend example file
-   cp frontend/.env-example frontend/.env
-   
-   # Edit the .env files with your specific values
-   nano .env
-   nano frontend/.env
-   ```
-   
-   Alternatively, run the included setup script:
-   ```
-   ./setup_env.sh
-   ```
-
-### Security Considerations
-
-For production deployment:
-1. Generate a strong Django secret key and JWT signing key:
-   ```
-   python generate_secure_keys.py
-   ```
-   This script will generate secure keys and optionally update your .env file.
-2. Set `DJANGO_DEBUG=False` in your .env file
-3. Configure proper `ALLOWED_HOSTS` and CORS settings
-4. Set up proper email configuration
-5. Use HTTPS with SSL/TLS certificates
-6. Consider using a more robust database like PostgreSQL
-7. Make sure Redis is secured behind a firewall or uses authentication
-
-### Docker Deployment
-
-For Docker-based deployment, refer to the [Docker README](README.docker.md) for detailed instructions on setting up and running the application with Docker.
-
-### Backend Setup
-
-1. Clone the repository
 ```
+┌────────────────┐     ┌────────────────┐     ┌────────────────┐
+│                │     │                │     │                │
+│  React         │     │  Django        │     │  Celery        │
+│  Frontend      │◄────┤  Backend       │◄────┤  Workers       │
+│                │     │                │     │                │
+└────────────────┘     └────────────────┘     └────────────────┘
+        ▲                      ▲                      ▲
+        │                      │                      │
+        └──────────────────────┼──────────────────────┘
+                              │
+                     ┌────────────────┐
+                     │                │
+                     │  Redis         │
+                     │  (WS/Cache)    │
+                     │                │
+                     └────────────────┘
+```
+
+For a detailed architecture overview, see the [Architecture Documentation](docs/ARCHITECTURE.md).
+
+## 📋 Quick Start
+
+```bash
+# Clone the repository
 git clone <repository-url>
 cd projectmanagement
-```
 
-2. Create and activate a virtual environment
-```
+# Set up environment variables
+cp env-example .env
+cp frontend/.env-example frontend/.env
+
+# Run with Docker
+docker-compose up -d
+
+# Or for development setup
+./setup_env.sh
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies
-```
+source venv/bin/activate
 pip install -r requirements.txt
-```
-
-4. Run migrations
-```
 python manage.py migrate
-```
-
-5. Create a superuser
-```
-python manage.py createsuperuser
-```
-
-6. Start the development server
-```
 python manage.py runserver
 ```
 
-7. In a separate terminal, start Celery worker
-```
-celery -A projectmanagement worker --loglevel=info
-```
+For detailed setup instructions, see the [Installation Guide](docs/INSTALLATION.md).
 
-8. For WebSocket support, ensure Redis is running
-```
-redis-server
-```
-
-### Frontend Setup
-
-1. Navigate to the frontend directory
-```
-cd frontend
-```
-
-2. Install dependencies
-```
-npm install
-```
-
-3. Start the development server
-```
-npm start
-```
-
-## Using the Application
-
-### Activity Logs & Audit Trail
-- Access the activity logs by clicking on "Activity Logs" in the main navigation
-- Filter logs by date, user, action type, or content type
-- Project-specific activity can be viewed from the project's activity tab
-
-### User Registration
-- Register using email, username, and password
-- The system will create a default user preference profile automatically
-
-### Creating Projects & Tasks
-1. Create an organization first
-2. Create projects within the organization
-3. Create boards within projects
-4. Add columns to boards
-5. Create and assign tasks within columns
-
-### Real-time Collaboration
-- Multiple users can view and edit the same board simultaneously
-- Changes are reflected in real-time via WebSockets
-
-## API Documentation
-
-API documentation is available at:
-- Swagger UI: `/api/docs/`
-- ReDoc: `/api/redoc/`
-
-## License
+## 📝 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
