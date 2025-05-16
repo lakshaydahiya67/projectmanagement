@@ -3,11 +3,12 @@ version: '3.8'
 services:
   # Redis service for caching, WebSockets and Celery
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
     container_name: redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    # Only expose Redis to other containers, not to the host
+    expose:
+      - "6379"
     volumes:
       - redis_data:/data
     networks:
@@ -17,6 +18,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    command: ["redis-server", "--appendonly", "yes"]
 
   # Backend Django service
   backend:
@@ -26,15 +28,16 @@ services:
     container_name: backend
     restart: unless-stopped
     volumes:
-      - ./:/app
-      - ./env-example:/app/.env
       - sqlite_data:/data
+      - static_data:/app/staticfiles
+      - media_data:/app/media
     entrypoint: ["/app/docker/entrypoint-backend.sh"]
     depends_on:
       redis:
         condition: service_healthy
-    ports:
-      - "8000:8000"
+    env_file:
+      - .env
+    # Add environment variables not in .env file
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -42,6 +45,12 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - DJANGO_SETTINGS_MODULE=projectmanagement.settings
       - DATABASE_PATH=/data/db.sqlite3
+      # Superuser credentials for first run (only used if superuser doesn't exist)
+      - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME:-admin}
+      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-admin@example.com}
+      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-adminpassword}
+    expose:
+      - "8000"
     networks:
       - app_network
     healthcheck:
@@ -50,6 +59,12 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+    # Set memory and CPU limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
 
   # Celery worker
   celery_worker:
@@ -59,15 +74,16 @@ services:
     container_name: celery_worker
     restart: unless-stopped
     volumes:
-      - ./:/app
-      - ./env-example:/app/.env
       - sqlite_data:/data
+      - media_data:/app/media
     entrypoint: ["/app/docker/entrypoint-celery.sh"]
     depends_on:
       backend:
         condition: service_healthy
       redis:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -77,6 +93,11 @@ services:
       - DATABASE_PATH=/data/db.sqlite3
     networks:
       - app_network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
 
   # Celery beat for scheduled tasks
   celery_beat:
@@ -86,8 +107,6 @@ services:
     container_name: celery_beat
     restart: unless-stopped
     volumes:
-      - ./:/app
-      - ./env-example:/app/.env
       - sqlite_data:/data
     entrypoint: ["/app/docker/entrypoint-celerybeat.sh"]
     depends_on:
@@ -95,6 +114,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -104,6 +125,11 @@ services:
       - DATABASE_PATH=/data/db.sqlite3
     networks:
       - app_network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 128M
 
   # Frontend React service
   frontend:
@@ -119,6 +145,11 @@ services:
         condition: service_healthy
     networks:
       - app_network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
 
 networks:
   app_network:
@@ -126,4 +157,6 @@ networks:
 
 volumes:
   redis_data:
-  sqlite_data: 
+  sqlite_data:
+  static_data:
+  media_data:
