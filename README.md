@@ -38,12 +38,17 @@ A Trello/Asana-like project management application with real-time collaboration,
 
 ### Environment Setup
 
-1. For environment variables, use the provided `abc.txt` file:
+1. For environment variables, use the provided `env-example` files:
    ```
-   # Copy the example file
-   cp abc.txt .env
-   # Edit the .env file with your specific values
+   # Copy the backend example file
+   cp env-example .env
+   
+   # Copy the frontend example file
+   cp frontend/.env-example frontend/.env
+   
+   # Edit the .env files with your specific values
    nano .env
+   nano frontend/.env
    ```
    
    Alternatively, run the included setup script:
@@ -54,13 +59,21 @@ A Trello/Asana-like project management application with real-time collaboration,
 ### Security Considerations
 
 For production deployment:
-1. Generate a strong Django secret key and JWT signing key
-2. Set `DJANGO_DEBUG=False`
+1. Generate a strong Django secret key and JWT signing key:
+   ```
+   python generate_secure_keys.py
+   ```
+   This script will generate secure keys and optionally update your .env file.
+2. Set `DJANGO_DEBUG=False` in your .env file
 3. Configure proper `ALLOWED_HOSTS` and CORS settings
 4. Set up proper email configuration
 5. Use HTTPS with SSL/TLS certificates
 6. Consider using a more robust database like PostgreSQL
 7. Make sure Redis is secured behind a firewall or uses authentication
+
+### Docker Deployment
+
+For Docker-based deployment, refer to the [Docker README](README.docker.md) for detailed instructions on setting up and running the application with Docker.
 
 ### Backend Setup
 

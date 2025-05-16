@@ -19,13 +19,39 @@ from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import JsonResponse
+from django.db import connections
+from django.db.utils import OperationalError
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
+import redis
+import os
 
 def health_check(request):
-    """Health check endpoint for Docker"""
-    return JsonResponse({"status": "ok"})
+    """Health check endpoint for Docker that verifies database and Redis connections"""
+    status = {"status": "ok", "services": {}}
+    
+    # Check database connection
+    try:
+        db_conn = connections['default']
+        db_conn.cursor()
+        status["services"]["database"] = "up"
+    except OperationalError:
+        status["services"]["database"] = "down"
+        status["status"] = "degraded"
+    
+    # Check Redis connection if used
+    try:
+        redis_host = os.environ.get('REDIS_HOST', '127.0.0.1')
+        redis_port = int(os.environ.get('REDIS_PORT', 6379))
+        r = redis.Redis(host=redis_host, port=redis_port, socket_connect_timeout=2)
+        r.ping()
+        status["services"]["redis"] = "up"
+    except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError):
+        status["services"]["redis"] = "down"
+        status["status"] = "degraded"
+    
+    return JsonResponse(status)
 
 # API Documentation with Swagger/OpenAPI
 schema_view = get_schema_view(

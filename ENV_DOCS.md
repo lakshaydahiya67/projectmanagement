@@ -6,7 +6,7 @@ This document describes all environment variables used in the Project Management
 
 The application uses environment variables for configuration. To set up your environment:
 
-1. Copy the provided `abc.txt` file to `.env`: `cp abc.txt .env`
+1. Copy the provided `env-example` file to `.env`: `cp env-example .env`
 2. Edit the generated `.env` file with your specific values
 3. Alternatively, run the setup script: `./setup_env.sh`
 
@@ -70,7 +70,7 @@ The application uses environment variables for configuration. To set up your env
 
 To use Gmail as your email provider:
 
-1. Set the following variables in your `.env` file (copied from `abc.txt`):
+1. Set the following variables in your `.env` file (copied from `env-example`):
    ```
    EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
    EMAIL_HOST=smtp.gmail.com
@@ -118,5 +118,5 @@ When deploying to production, make sure to:
 1. **Never hardcode environment variables in your code**. Always use the `.env` file or environment variables.
 2. **Ensure your `.env` files are in `.gitignore`** to prevent committing sensitive information.
 3. **Regularly rotate secrets** like JWT signing keys, especially after developer offboarding.
-4. Never commit your `.env` files to version control. The `abc.txt` files should be committed instead as templates.
+4. Never commit your `.env` files to version control. The `env-example` files should be committed instead as templates.
 5. Consider using a secret management service for production environments.

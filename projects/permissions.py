@@ -7,10 +7,22 @@ class IsProjectMember(permissions.BasePermission):
     Permission to only allow members of a project to access it
     """
     def has_permission(self, request, view):
+        # Try to get project ID from various possible routes
         project_id = view.kwargs.get('project_pk') or view.kwargs.get('pk')
-        if not project_id:
-            return False
         
+        # Handle nested routes through columns
+        if not project_id:
+            column_id = view.kwargs.get('column_pk')
+            if column_id:
+                from projects.models import Column
+                try:
+                    column = Column.objects.get(id=column_id)
+                    project_id = column.board.project_id
+                except Column.DoesNotExist:
+                    return False
+            else:
+                return False
+                
         # Check if project is public
         try:
             project = Project.objects.get(id=project_id)
@@ -35,6 +47,9 @@ class IsProjectMember(permissions.BasePermission):
             project = obj.project
         elif isinstance(obj, Project):
             project = obj
+        elif hasattr(obj, 'column') and hasattr(obj.column, 'board'):
+            # Support for Task objects that have column->board->project path
+            project = obj.column.board.project
         else:
             return False
             
@@ -56,9 +71,21 @@ class IsProjectAdmin(permissions.BasePermission):
     Permission to only allow admins/owners of a project to modify it
     """
     def has_permission(self, request, view):
+        # Try to get project ID from various possible routes
         project_id = view.kwargs.get('project_pk') or view.kwargs.get('pk')
+        
+        # Handle nested routes through columns
         if not project_id:
-            return False
+            column_id = view.kwargs.get('column_pk')
+            if column_id:
+                from projects.models import Column
+                try:
+                    column = Column.objects.get(id=column_id)
+                    project_id = column.board.project_id
+                except Column.DoesNotExist:
+                    return False
+            else:
+                return False
         
         membership = ProjectMember.objects.filter(
             project_id=project_id,
@@ -76,6 +103,9 @@ class IsProjectAdmin(permissions.BasePermission):
             project = obj.project
         elif isinstance(obj, Project):
             project = obj
+        elif hasattr(obj, 'column') and hasattr(obj.column, 'board'):
+            # Support for Task objects that have column->board->project path
+            project = obj.column.board.project
         else:
             return False
         

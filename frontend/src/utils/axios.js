@@ -31,7 +31,8 @@ axiosInstance.interceptors.request.use(
       // This helps prevent CORS preflight issues
       if (config.url && (
         config.url.includes('/auth/jwt/') || 
-        config.url.includes('/users/me')
+        config.url.includes('/users/me') ||
+        config.url.includes('/auth/users/reset_password/')
       )) {
         config.withCredentials = true;
       }

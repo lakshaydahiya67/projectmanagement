@@ -1,101 +1,46 @@
 #!/usr/bin/env python
 """
 A diagnostic script to test email functionality.
-This script will:
-1. Print current email settings
-2. Attempt to send a test email
-3. Report any errors in detail
+
+This script will set up Django, initialize the email backend with your
+current settings, and send a test email to verify the configuration.
 """
 
 import os
 import sys
-import logging
-from django.core.mail import send_mail, get_connection
+import django
+from django.core.mail import send_mail
 from django.conf import settings
+from dotenv import load_dotenv
 
-# Setup logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger(__name__)
+# Load environment variables from .env file
+load_dotenv()
 
-def setup_django():
-    """Set up Django environment"""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'projectmanagement.settings')
-    import django
-    django.setup()
+# Set the Django settings module
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'projectmanagement.settings')
+django.setup()
 
-def check_env_variables():
-    """Check if all required email environment variables are set"""
-    required_vars = [
-        'EMAIL_BACKEND',
-        'EMAIL_HOST',
-        'EMAIL_PORT',
-        'EMAIL_USE_TLS',
-        'EMAIL_HOST_USER',
-        'EMAIL_HOST_PASSWORD',
-        'DEFAULT_FROM_EMAIL'
-    ]
-    
-    logger.info("Checking environment variables...")
-    
-    for var in required_vars:
-        value = os.environ.get(var)
-        # Don't log actual password values
-        if var == 'EMAIL_HOST_PASSWORD' and value:
-            logger.info(f"{var}: [Set - value hidden]")
-        else:
-            logger.info(f"{var}: {value if value else '[NOT SET]'}")
-    
-    # Check the settings.py values as well
-    logger.info("\nDjango settings values:")
-    for var in required_vars:
-        if var == 'EMAIL_HOST_PASSWORD' and hasattr(settings, var) and getattr(settings, var):
-            logger.info(f"{var}: [Set - value hidden]")
-        else:
-            if hasattr(settings, var):
-                logger.info(f"{var}: {getattr(settings, var)}")
-            else:
-                logger.info(f"{var}: [NOT FOUND IN SETTINGS]")
+def test_email_config():
+    """Print the current email configuration"""
+    print("\nCurrent Email Configuration:")
+    print(f"EMAIL_BACKEND: {settings.EMAIL_BACKEND}")
+    print(f"EMAIL_HOST: {settings.EMAIL_HOST}")
+    print(f"EMAIL_PORT: {settings.EMAIL_PORT}")
+    print(f"EMAIL_USE_TLS: {settings.EMAIL_USE_TLS}")
+    print(f"EMAIL_HOST_USER: {settings.EMAIL_HOST_USER}")
+    print(f"EMAIL_HOST_PASSWORD: {'*' * 10 if settings.EMAIL_HOST_PASSWORD else 'Not set'}")
+    print(f"DEFAULT_FROM_EMAIL: {settings.DEFAULT_FROM_EMAIL}")
 
-def test_email_connection():
-    """Test the email connection without sending an actual email"""
-    try:
-        logger.info("\nTesting email connection...")
-        connection = get_connection()
-        connection.open()
-        logger.info("✅ Connection successful!")
-        connection.close()
-        return True
-    except Exception as e:
-        logger.error(f"❌ Connection failed: {str(e)}")
-        logger.exception(e)
-        return False
-
-def send_test_email(recipient):
+def send_test_email(to_email):
     """Send a test email"""
+    print(f"\nSending test email to {to_email}...")
+    
+    subject = 'Test Email from Project Management App'
+    message = 'This is a test email to verify your email configuration. If you receive this, your email setup is working correctly!'
+    from_email = settings.DEFAULT_FROM_EMAIL
+    recipient_list = [to_email]
+    
     try:
-        logger.info(f"\nSending test email to {recipient}...")
-        
-        # First, make sure connection works
-        if not test_email_connection():
-            return False
-        
-        subject = 'Test Email from Project Management App'
-        message = 'This is a test email to verify SMTP functionality. If you receive this, the email system is working correctly!'
-        from_email = settings.DEFAULT_FROM_EMAIL
-        recipient_list = [recipient]
-        
-        # Log what we're about to do
-        logger.info(f"Subject: {subject}")
-        logger.info(f"From: {from_email}")
-        logger.info(f"To: {recipient_list}")
-        
-        # Send the email
         result = send_mail(
             subject=subject,
             message=message,
@@ -105,31 +50,30 @@ def send_test_email(recipient):
         )
         
         if result:
-            logger.info(f"✅ Email sent successfully! Result: {result}")
+            print("\nSuccess! Test email sent.")
+            print(f"Email sent from {from_email} to {to_email}")
             return True
         else:
-            logger.error("❌ Email sending failed with no exception, but returned False")
+            print("\nError: Email sending failed without raising an exception. Check your settings.")
             return False
     except Exception as e:
-        logger.error(f"❌ Email sending failed: {str(e)}")
-        logger.exception(e)
+        print(f"\nError sending email: {str(e)}")
+        print("\nTroubleshooting tips:")
+        print("1. Check your EMAIL_HOST and EMAIL_PORT settings")
+        print("2. Verify EMAIL_HOST_USER and EMAIL_HOST_PASSWORD are correct")
+        print("3. If using Gmail, ensure you've created an App Password")
+        print("4. Check your firewall/network settings")
         return False
 
 if __name__ == "__main__":
-    # Setup Django first
-    setup_django()
+    # Display the current email config
+    test_email_config()
     
-    # Check environment variables
-    check_env_variables()
-    
-    # Ask for recipient email
+    # Get the recipient email
     if len(sys.argv) > 1:
-        recipient = sys.argv[1]
+        to_email = sys.argv[1]
     else:
-        recipient = input("\nEnter recipient email address: ")
+        to_email = input("\nEnter recipient email address: ")
     
-    # Send test email
-    if send_test_email(recipient):
-        print("\n✅ Email test completed successfully!")
-    else:
-        print("\n❌ Email test failed. Check logs above for details.") 
+    # Send the test email
+    send_test_email(to_email) 

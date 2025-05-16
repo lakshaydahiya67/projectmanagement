@@ -36,7 +36,7 @@ class Notification(models.Model):
     
     # For linking notification to any model (task, project, comment, etc.)
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
-    object_id = models.PositiveIntegerField(null=True, blank=True)
+    object_id = models.TextField(null=True, blank=True)  # Changed to TextField to support UUIDs and other non-integer IDs
     content_object = GenericForeignKey('content_type', 'object_id')
     
     class Meta:

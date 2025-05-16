@@ -1,0 +1,32 @@
+# Django
+Django==4.2.11
+asgiref==3.7.2
+sqlparse==0.4.4
+python-dotenv==1.0.1
+
+# Django REST Framework
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+djoser==2.2.2
+djangorestframework-simplejwt==5.3.0
+django-filter==23.5
+drf-yasg==1.21.7
+drf-nested-routers==0.94.2
+
+# Websocket support
+channels==4.0.0
+daphne==4.0.0
+channels-redis==4.1.0
+# Note: channels-daphne is now integrated into daphne>=4.0.0
+
+# Async task processing
+celery==5.3.6
+redis==5.0.1
+
+# File Handling
+Pillow==10.1.0
+
+# Channels
+channels-redis==4.1.0
+channels-postgres==4.0.0
+channels-rabbitmq==4.0.0

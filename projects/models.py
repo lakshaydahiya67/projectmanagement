@@ -6,6 +6,13 @@ from django.utils.text import slugify
 import uuid
 import datetime
 
+def get_today():
+    """
+    Return today's date (without time component)
+    Using a function to avoid serialization issues with model defaults
+    """
+    return timezone.now().date()
+
 class Project(models.Model):
     """Project model that belongs to an organization"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -15,7 +22,7 @@ class Project(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_projects')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    start_date = models.DateField(default=timezone.now)
+    start_date = models.DateField(default=get_today)  # Using a custom function for the default date
     end_date = models.DateField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_public = models.BooleanField(default=False)

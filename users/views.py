@@ -1,6 +1,7 @@
 from rest_framework import viewsets, generics, status, permissions
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.contrib.contenttypes.models import ContentType
@@ -10,6 +11,10 @@ from .serializers import (
     UserUpdateSerializer, UserPreferenceSerializer, ChangePasswordSerializer
 )
 from .permissions import IsUserOrReadOnly, IsUserOwner
+from django.core.mail import send_mail
+from django.conf import settings
+from .email import PasswordResetEmail, ActivationEmail
+import logging
 
 # Try to import ActivityLog model if available
 try:
@@ -19,6 +24,8 @@ except ImportError:
     ACTIVITY_LOGS_ENABLED = False
 
 User = get_user_model()
+
+logger = logging.getLogger(__name__)
 
 class UserViewSet(viewsets.ModelViewSet):
     """
@@ -71,8 +78,8 @@ class UserViewSet(viewsets.ModelViewSet):
                 user=self.request.user,
                 content_type=ContentType.objects.get_for_model(instance),
                 object_id=str(instance.id),
-                action=ActivityLog.UPDATE,
-                details=f"User profile updated"
+                action_type=ActivityLog.UPDATED,
+                description=f"User profile updated"
             )
     
     @action(detail=True, methods=['post'], permission_classes=[IsUserOwner])
@@ -97,8 +104,8 @@ class UserViewSet(viewsets.ModelViewSet):
                         user=request.user,
                         content_type=ContentType.objects.get_for_model(user),
                         object_id=str(user.id),
-                        action=ActivityLog.UPDATE,
-                        details="Password changed"
+                        action_type=ActivityLog.UPDATED,
+                        description="Password changed"
                     )
                     
             return Response({"status": "password changed successfully"}, 
@@ -134,6 +141,69 @@ class UserPreferenceView(generics.RetrieveUpdateAPIView):
                 user=self.request.user,
                 content_type=ContentType.objects.get_for_model(self.request.user),
                 object_id=str(self.request.user.id),
-                action=ActivityLog.UPDATE,
-                details="User preferences updated"
+                action_type=ActivityLog.UPDATED,
+                description="User preferences updated"
             )
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def test_reset_email(request):
+    """
+    Test endpoint to verify password reset email functionality.
+    This is for development/testing only and should be disabled in production.
+    """
+    if not settings.DEBUG:
+        return Response({"detail": "This endpoint is only available in DEBUG mode."}, 
+                        status=status.HTTP_403_FORBIDDEN)
+    
+    email = request.data.get('email', '')
+    if not email:
+        return Response({"detail": "Email is required."}, 
+                        status=status.HTTP_400_BAD_REQUEST)
+    
+    # Create a minimal user object for testing
+    class TestUser:
+        def __init__(self, email):
+            self.email = email
+            self.username = email
+            self.pk = 1
+            
+        def get_full_name(self):
+            return self.username
+            
+    user = TestUser(email)
+    
+    try:
+        # Create a password reset email using your custom email class
+        email_instance = PasswordResetEmail({'user': user, 'protocol': 'http'})
+        context = email_instance.get_context_data()
+        
+        # Send email using standard Django send_mail
+        result = send_mail(
+            subject="Test Password Reset Email",
+            message=f"This is a test password reset email. Please use this link: {context.get('reset_url')}",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=False,
+            html_message=f"<h1>Test Password Reset</h1><p>This is a test email to verify the email system.</p><p>Reset URL: <a href='{context.get('reset_url')}'>{context.get('reset_url')}</a></p>"
+        )
+        
+        if result:
+            logger.info(f"Test password reset email sent successfully to {email}")
+            return Response({
+                "detail": "Test password reset email sent successfully.",
+                "reset_url": context.get('reset_url'),
+                "debug_info": context
+            })
+        else:
+            logger.error(f"Failed to send test password reset email to {email}")
+            return Response({
+                "detail": "Failed to send test email. Check server logs for details.",
+                "debug_info": context
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+    except Exception as e:
+        logger.exception(f"Error sending test password reset email: {str(e)}")
+        return Response({
+            "detail": f"Error: {str(e)}",
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -19,8 +19,8 @@ def project_created_handler(sender, instance, created, **kwargs):
             user=instance.created_by,
             content_type=ContentType.objects.get_for_model(instance),
             object_id=str(instance.id),
-            action=ActivityLog.CREATE,
-            details=f"Project '{instance.name}' was created"
+            action_type=ActivityLog.CREATED,
+            description=f"Project '{instance.name}' was created"
         )
 
 @receiver(post_save, sender=ProjectMember)
@@ -31,8 +31,8 @@ def project_member_handler(sender, instance, created, **kwargs):
             user=instance.user,
             content_type=ContentType.objects.get_for_model(instance.project),
             object_id=str(instance.project.id),
-            action=ActivityLog.UPDATE,
-            details=f"{instance.user.get_full_name()} joined project '{instance.project.name}' with role {instance.get_role_display()}"
+            action_type=ActivityLog.UPDATED,
+            description=f"{instance.user.get_full_name()} joined project '{instance.project.name}' with role {instance.get_role_display()}"
         )
 
 @receiver(post_save, sender=Board)
@@ -43,8 +43,8 @@ def board_created_handler(sender, instance, created, **kwargs):
             user=instance.created_by,
             content_type=ContentType.objects.get_for_model(instance.project),
             object_id=str(instance.project.id),
-            action=ActivityLog.UPDATE,
-            details=f"Board '{instance.name}' was created for project '{instance.project.name}'"
+            action_type=ActivityLog.UPDATED,
+            description=f"Board '{instance.name}' was created for project '{instance.project.name}'"
         )
 
 @receiver(post_save, sender=Column)
@@ -58,6 +58,6 @@ def column_created_handler(sender, instance, created, **kwargs):
             user=user,
             content_type=ContentType.objects.get_for_model(instance.board.project),
             object_id=str(instance.board.project.id),
-            action=ActivityLog.UPDATE,
-            details=f"Column '{instance.name}' was added to board '{instance.board.name}'"
+            action_type=ActivityLog.UPDATED,
+            description=f"Column '{instance.name}' was added to board '{instance.board.name}'"
         ) 

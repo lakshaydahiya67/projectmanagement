@@ -27,7 +27,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./:/app
-      - ./abc.txt:/app/abc.txt
+      - ./env-example:/app/.env
       - sqlite_data:/data
     entrypoint: ["/app/docker/entrypoint-backend.sh"]
     depends_on:
@@ -60,7 +60,8 @@ services:
     restart: unless-stopped
     volumes:
       - ./:/app
-      - ./abc.txt:/app/abc.txt
+      - ./env-example:/app/.env
+      - sqlite_data:/data
     entrypoint: ["/app/docker/entrypoint-celery.sh"]
     depends_on:
       backend:
@@ -86,7 +87,8 @@ services:
     restart: unless-stopped
     volumes:
       - ./:/app
-      - ./abc.txt:/app/abc.txt
+      - ./env-example:/app/.env
+      - sqlite_data:/data
     entrypoint: ["/app/docker/entrypoint-celerybeat.sh"]
     depends_on:
       backend:

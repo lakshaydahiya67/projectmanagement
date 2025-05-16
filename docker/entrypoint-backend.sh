@@ -5,6 +5,14 @@ set -e
 # Wait for Redis to be ready
 ./docker/wait-for-it.sh ${REDIS_HOST:-redis}:${REDIS_PORT:-6379} -t 60
 
+# Test email configuration if using SMTP
+if [ "$EMAIL_BACKEND" = "django.core.mail.backends.smtp.EmailBackend" ]; then
+    echo "Testing email configuration..."
+    python -m email_test admin@example.com || {
+        echo "Warning: Email configuration test failed but continuing startup"
+    }
+fi
+
 # Apply database migrations
 echo "Applying database migrations..."
 python manage.py migrate --noinput

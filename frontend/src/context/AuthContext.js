@@ -179,10 +179,40 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
-      await axios.post('/auth/users/reset_password/', { email });
+      // Use a dedicated axios instance without auth headers for password reset
+      const resetAxios = axios.create({
+        baseURL: 'http://localhost:8000/api/v1',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        withCredentials: false
+      });
+      
+      console.log('Sending password reset request for:', email);
+      
+      await resetAxios.post('/auth/users/reset_password/', { email });
+      
+      console.log('Password reset request successful');
       return true;
     } catch (err) {
-      setError(err.response?.data || 'Password reset request failed');
+      console.error('Password reset error:', err);
+      
+      // In development, log more details
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error details:', {
+          message: err.message,
+          response: err.response?.data,
+          status: err.response?.status
+        });
+      }
+      
+      // Djoser doesn't tell us if the email exists, but we show a success message anyway
+      // This is a security feature to prevent email enumeration
+      if (err.response?.status === 400) {
+        return true; // Return success even if email doesn't exist
+      }
+      
+      setError(err.response?.data?.detail || 'Password reset request failed');
       throw err;
     } finally {
       setLoading(false);

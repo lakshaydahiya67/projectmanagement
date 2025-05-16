@@ -26,8 +26,8 @@ def task_created_handler(sender, instance, created, **kwargs):
             user=instance.created_by,
             content_type=ContentType.objects.get_for_model(instance),
             object_id=str(instance.id),
-            action=ActivityLog.CREATE,
-            details=f"Task '{instance.title}' was created in column '{instance.column.name}'"
+            action_type=ActivityLog.CREATED,
+            description=f"Task '{instance.title}' was created in column '{instance.column.name}'"
         )
 
 @receiver(m2m_changed, sender=Task.assignees.through)
@@ -61,8 +61,8 @@ def task_assignees_changed(sender, instance, action, pk_set, **kwargs):
                 user=assigned_by,
                 content_type=ContentType.objects.get_for_model(instance),
                 object_id=str(instance.id),
-                action=ActivityLog.UPDATE,
-                details=f"Task '{instance.title}' assigned to {', '.join(assignee_names)}"
+                action_type=ActivityLog.UPDATED,
+                description=f"Task '{instance.title}' assigned to {', '.join(assignee_names)}"
             )
 
 @receiver(post_save, sender=Comment)
@@ -75,8 +75,8 @@ def comment_created_handler(sender, instance, created, **kwargs):
                 user=instance.author,
                 content_type=ContentType.objects.get_for_model(instance.task),
                 object_id=str(instance.task.id),
-                action=ActivityLog.UPDATE,
-                details=f"Comment added to task '{instance.task.title}'"
+                action_type=ActivityLog.UPDATED,
+                description=f"Comment added to task '{instance.task.title}'"
             )
         
         # Send notification about the new comment
@@ -91,6 +91,6 @@ def attachment_created_handler(sender, instance, created, **kwargs):
             user=instance.uploaded_by,
             content_type=ContentType.objects.get_for_model(instance.task),
             object_id=str(instance.task.id),
-            action=ActivityLog.UPDATE,
-            details=f"File '{instance.filename}' attached to task '{instance.task.title}'"
+            action_type=ActivityLog.UPDATED,
+            description=f"File '{instance.filename}' attached to task '{instance.task.title}'"
         ) 

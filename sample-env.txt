@@ -1,5 +1,5 @@
 # Django Project Environment Variables
-# Copy this file to abc.txt and modify as needed
+# This is a sample environment file. Use env-example instead.
 
 # Core Django Settings
 DJANGO_DEBUG=True

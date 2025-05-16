@@ -24,11 +24,20 @@ const ForgotPassword = () => {
       setMessage('');
       setIsLoading(true);
       
-      await resetPassword(email);
-      setMessage('Password reset link has been sent to your email address.');
+      try {
+        await resetPassword(email);
+        // Always show success whether the email exists or not
+        setMessage('If a user with this email exists, a password reset link has been sent to their email address.');
+      } catch (err) {
+        // Still show success message for security reasons (prevents email enumeration)
+        setMessage('If a user with this email exists, a password reset link has been sent to their email address.');
+        console.error('Error in password reset:', err);
+      }
+      
       setEmail('');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to send password reset email. Please try again.');
+      // Only show error for system errors, not for invalid email
+      setError('An unexpected error occurred. Please try again later.');
     } finally {
       setIsLoading(false);
     }
