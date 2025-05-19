@@ -76,7 +76,7 @@ services:
   - type: redis
     name: projectmanagement-redis
     plan: free
-    allowedIPs: []  # Allow all IPs by default
+    ipAllowList: []  # Allow all IPs by default
 
 databases:
   - name: projectmanagement-db
