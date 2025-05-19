@@ -5,14 +5,14 @@ set -ex
 
 # Install Python dependencies
 echo "=== Installing Python dependencies ==="
-pip install --upgrade pip
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 
 # Install Node.js dependencies and build the frontend
 echo -e "\n=== Building frontend ==="
 cd frontend
 npm ci --prefer-offline --no-audit --progress=false
-npm run build:ci
+CI=false npm run build
 cd ..
 
 # Set up static files

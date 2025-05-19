@@ -4,10 +4,8 @@ services:
     env: python
     plan: free
     buildCommand: chmod +x ./render-build.sh && ./render-build.sh
-    startCommand: >-
-      if [ -z "$DJANGO_SUPERUSER_PASSWORD" ]; then
-        echo "Warning: DJANGO_SUPERUSER_PASSWORD is not set. Skipping superuser creation."
-      else
+    startCommand: |
+      if [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$DJANGO_SUPERUSER_EMAIL" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ]; then
         python manage.py create_superuser --noinput \
           --username=${DJANGO_SUPERUSER_USERNAME} \
           --email=${DJANGO_SUPERUSER_EMAIL} \
@@ -67,9 +65,10 @@ services:
     env: node
     plan: free
     buildCommand: |
-      cd frontend
-      npm ci --prefer-offline --no-audit --progress=false
-      npm run build:ci
+      cd frontend && \
+      npm ci --prefer-offline --no-audit --progress=false && \
+      npm install -g serve && \
+      CI=false npm run build
     staticPublishPath: ./frontend/build
     startCommand: 'serve -s build -l $PORT'
     envVars:
@@ -81,7 +80,6 @@ services:
         value: "false"
       - key: REACT_APP_WS_URL
         value: 'wss://projectmanagement-backend.onrender.com/ws/'
-    plan: free
 
   - type: redis
     name: projectmanagement-redis

@@ -42,6 +42,53 @@ This project's documentation is organized into the following sections:
 - Chart.js for data visualization
 - React Beautiful DND for drag-and-drop
 
+## 🚀 Deployment on Render.com
+
+### Prerequisites
+- A Render.com account
+- GitHub repository with your code
+- PostgreSQL database (provided by Render)
+- Redis instance (provided by Render)
+
+### Setup Instructions
+
+1. **Fork and Clone** the repository
+2. **Set up Environment Variables**:
+   - Copy `.env.example` to `.env`
+   - Update the values in `.env` with your configuration
+   - Make sure to set `RENDER=true` in your production environment
+
+3. **Deploy to Render**:
+   - Connect your GitHub repository to Render
+   - Create a new Web Service for the backend
+   - Create a new Static Site for the frontend
+   - Create a Redis instance
+   - Create a PostgreSQL database
+
+4. **Environment Variables for Backend**:
+   ```
+   DATABASE_URL=postgres://user:pass@host:port/dbname
+   CELERY_BROKER_URL=redis://:password@host:port
+   CELERY_RESULT_BACKEND=redis://:password@host:port
+   DJANGO_SETTINGS_MODULE=projectmanagement.settings
+   DJANGO_SECRET_KEY=your-secret-key
+   DJANGO_DEBUG=False
+   ```
+
+5. **Environment Variables for Frontend**:
+   ```
+   REACT_APP_API_URL=https://your-backend-url.onrender.com
+   REACT_APP_WS_URL=wss://your-backend-url.onrender.com/ws
+   ```
+
+6. **Build Commands**:
+   - Backend: `chmod +x ./render-build.sh && ./render-build.sh`
+   - Frontend: `cd frontend && npm ci && npm run build`
+
+7. **Start Commands**:
+   - Backend: `gunicorn projectmanagement.wsgi:application --log-file -`
+   - Frontend: `serve -s build -l $PORT`
+
 ## 🏗️ Project Architecture
 
 ```
