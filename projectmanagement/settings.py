@@ -29,27 +29,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-j8l)e0!vcg6h*nbl0*qoo$@aox%8@64$&ykl=db9o4%q@y)t#b')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() == 'true'
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() == 'true'
 
-# Get allowed hosts from environment variable or use a default
-allowed_hosts = os.environ.get('RENDER_EXTERNAL_HOSTNAME', '')
-ALLOWED_HOSTS = []
-if allowed_hosts:
-    ALLOWED_HOSTS.append(allowed_hosts)
-ALLOWED_HOSTS.extend(os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,backend').split(','))
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,backend').split(',')
 
 # Frontend URL for redirects and email links
-FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://your-render-app-url.onrender.com')
-
-# Security settings for production
-if not DEBUG:
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_HSTS_SECONDS = 31536000  # 1 year
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost')
 
 
 # Application definition
@@ -216,18 +201,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-
-# Ensure STATIC_ROOT exists
-os.makedirs(STATIC_ROOT, exist_ok=True)
-
-# Media files
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
-# Ensure MEDIA_ROOT exists
-os.makedirs(MEDIA_ROOT, exist_ok=True)
+STATIC_URL = 'backend/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

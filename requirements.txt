@@ -1,14 +1,11 @@
-# Core dependencies
+# Django and core dependencies
 Django==4.2.11
+asgiref==3.7.2
+sqlparse==0.4.4
 python-dotenv==1.0.1
-gunicorn==21.2.0
-whitenoise==6.6.0
 
-# Database
-psycopg2-binary==2.9.9
-
-# API
-djangorestframework==3.15.0
+# DRF and API
+djangorestframework>=3.15.0
 django-cors-headers==4.3.1
 djoser==2.2.2
 djangorestframework-simplejwt==5.3.0
@@ -21,17 +18,17 @@ channels==4.0.0
 daphne==4.0.0
 channels-redis==4.1.0
 
+# Database
+# psycopg2-binary==2.9.9  # For PostgreSQL in production (uncomment if needed)
+
 # Task queue
 celery==5.3.6
 redis==5.0.1
 
-# Media processing
+# Development and testing tools
 Pillow==10.1.0
 
-# Production
-python-memcached==1.59
-sentry-sdk==1.39.1
-
-# Development only (not used in production)
-pytest-django==4.8.0
-pytest-cov==4.1.0
+# Additional channel backends (optional - commented out as they may not be needed)
+# channels-daphne==4.0.0
+# channels-postgres==4.0.0
+# channels-rabbitmq==4.0.0
