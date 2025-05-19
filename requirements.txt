@@ -1,10 +1,17 @@
-# Django and core dependencies
+# Core dependencies
 Django==4.2.11
 asgiref==3.7.2
 sqlparse==0.4.4
 python-dotenv==1.0.1
 
-# DRF and API
+# Database
+psycopg2-binary==2.9.9  # For PostgreSQL in production
+
+# WSGI Server
+gunicorn==21.2.0
+whitenoise==6.6.0  # For serving static files
+
+# API Framework
 djangorestframework>=3.15.0
 django-cors-headers==4.3.1
 djoser==2.2.2
@@ -13,25 +20,38 @@ django-filter==23.5
 drf-yasg==1.21.7
 drf-nested-routers==0.94.2
 
-# Websocket support
+# Authentication
+python-jose==3.3.0  # For JWT support
+python-jose[cryptography]
+
+# WebSockets
 channels==4.0.0
 daphne==4.0.0
 channels-redis==4.1.0
 
-# Database
-psycopg2-binary==2.9.9  # For PostgreSQL in production
-
-# WSGI Server
-gunicorn==21.2.0
-
-# Task queue
+# Task Queue
 celery==5.3.6
 redis==5.0.1
 
-# Development and testing tools
+# File handling
 Pillow==10.1.0
 
-# Additional channel backends (optional - commented out as they may not be needed)
+# Security
+python-decouple==3.8  # For environment variable handling
+
+# Email
+sendgrid==6.11.0  # For sending emails
+
+# Monitoring
+sentry-sdk==1.40.0  # For error tracking
+
+# Caching
+django-redis==5.4.0
+
+# Performance
+uvicorn==0.24.0  # ASGI server
+
+# Development (kept for compatibility)
 # channels-daphne==4.0.0
 # channels-postgres==4.0.0
 # channels-rabbitmq==4.0.0

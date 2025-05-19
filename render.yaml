@@ -2,11 +2,7 @@ services:
   - type: web
     name: projectmanagement-backend
     env: python
-    buildCommand: |
-      pip install -r requirements.txt
-      python manage.py collectstatic --noinput
-      python manage.py migrate
-    startCommand: gunicorn projectmanagement.wsgi:application --log-file -
+
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.12
@@ -16,20 +12,50 @@ services:
         generateValue: true
       - key: DJANGO_DEBUG
         value: 'False'
-      - key: ALLOWED_HOSTS
+      - key: DJANGO_ALLOWED_HOSTS
         value: 'projectmanagement-backend.onrender.com,projectmanagement.onrender.com,localhost,127.0.0.1'
+      - key: DJANGO_SUPERUSER_EMAIL
+        value: admin@example.com
+      - key: DJANGO_SUPERUSER_USERNAME
+        value: admin
+      - key: DJANGO_SUPERUSER_PASSWORD
+        generateValue: true
       - key: FRONTEND_URL
         value: 'https://projectmanagement.onrender.com'
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: projectmanagement-redis
+          type: redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          name: projectmanagement-redis
+          type: redis
+          property: connectionString
       - key: DATABASE_URL
         fromDatabase:
           name: projectmanagement-db
           property: connectionString
       - key: REDIS_URL
         fromService:
-          name: redis
+          name: projectmanagement-redis
           type: redis
           property: connectionString
+      - key: DJANGO_STATIC_ROOT
+        value: '/var/www/static/'
+      - key: DJANGO_MEDIA_ROOT
+        value: '/var/www/media/'
+      - key: DJANGO_CSRF_TRUSTED_ORIGINS
+        value: 'https://projectmanagement-backend.onrender.com https://projectmanagement.onrender.com'
     plan: free
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput --clear
+      python manage.py migrate
+    startCommand: >-
+      python manage.py create_superuser --noinput --username=admin --email=admin@example.com &&
+      gunicorn projectmanagement.wsgi:application --log-file -
 
   - type: web
     name: projectmanagement-frontend
@@ -56,6 +82,10 @@ databases:
   - name: projectmanagement-db
     databaseName: projectmanagement
     user: projectmanagement
+    plan: free
+
+redis:
+  - name: projectmanagement-redis
     plan: free
 
 crons:
