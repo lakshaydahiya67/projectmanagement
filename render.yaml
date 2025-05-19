@@ -87,8 +87,9 @@ databases:
     user: projectmanagement
     plan: free
 
-crons:
+jobs:
   - name: cleanup-sessions
+    type: cron
     schedule: '@daily'
     command: python manage.py clearsessions
     envVars:
