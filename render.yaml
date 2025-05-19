@@ -63,7 +63,7 @@ services:
       cd frontend
       npm install
       npm run build
-    staticPublishPath: ./frontend/build
+    startCommand: 'serve -s build -l $PORT'
     envVars:
       - key: NODE_VERSION
         value: 18.17.1
@@ -71,15 +71,12 @@ services:
         value: 'https://projectmanagement-backend.onrender.com/api/v1'
       - key: REACT_APP_WS_URL
         value: 'wss://projectmanagement-backend.onrender.com/ws/'
-    routes:
-      - type: rewrite
-        source: '/*'
-        destination: '/index.html'
     plan: free
 
   - type: redis
     name: projectmanagement-redis
     plan: free
+    allowedIPs: []  # Allow all IPs by default
 
 databases:
   - name: projectmanagement-db
