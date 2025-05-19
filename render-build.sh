@@ -4,23 +4,27 @@
 set -ex
 
 # Install Python dependencies
-echo "Installing Python dependencies..."
+echo "=== Installing Python dependencies ==="
 pip install --upgrade pip
 pip install -r requirements.txt
 
 # Install Node.js dependencies and build the frontend
-echo "Building frontend..."
+echo -e "\n=== Building frontend ==="
 cd frontend
 npm ci --prefer-offline --no-audit --progress=false
-npm run build
+npm run build:ci
 cd ..
 
 # Set up static files
-echo "Collecting static files..."
+echo -e "\n=== Collecting static files ==="
 python manage.py collectstatic --noinput --clear
 
 # Run database migrations
-echo "Running database migrations..."
+echo -e "\n=== Running database migrations ==="
 python manage.py migrate --noinput
 
-echo "Build completed successfully!"
+# Create cache table if using database cache
+echo -e "\n=== Setting up cache table ==="
+python manage.py createcachetable
+
+echo -e "\n✅ Build completed successfully!"
