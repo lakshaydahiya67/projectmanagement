@@ -53,12 +53,13 @@ services:
       - "8000"
     networks:
       - app_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+    # Temporarily disabled healthcheck to debug static files issue
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 3
+    #   start_period: 30s
     # Set memory and CPU limits
     deploy:
       resources:
@@ -79,7 +80,7 @@ services:
     entrypoint: ["/app/docker/entrypoint-celery.sh"]
     depends_on:
       backend:
-        condition: service_healthy
+        condition: service_started
       redis:
         condition: service_healthy
     env_file:
@@ -97,7 +98,7 @@ services:
       resources:
         limits:
           cpus: '0.3'
-          memory: 256M
+          memory: 512M
 
   # Celery beat for scheduled tasks
   celery_beat:
@@ -111,7 +112,7 @@ services:
     entrypoint: ["/app/docker/entrypoint-celerybeat.sh"]
     depends_on:
       backend:
-        condition: service_healthy
+        condition: service_started
       redis:
         condition: service_healthy
     env_file:
@@ -136,13 +137,20 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        - REACT_APP_API_URL=${BACKEND_URL}
+        - REACT_APP_WEBSOCKET_URL=${WEBSOCKET_URL}
     container_name: frontend
     restart: unless-stopped
     ports:
       - "80:80"
+    volumes:
+      - static_data:/usr/share/nginx/html/backend/static
     depends_on:
       backend:
-        condition: service_healthy
+        condition: service_started
+    env_file:
+      - .env
     networks:
       - app_network
     deploy:

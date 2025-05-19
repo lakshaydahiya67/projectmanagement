@@ -23,12 +23,15 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # Copy project files
 COPY . .
 
+# Create directory for SQLite database (if using SQLite)
+RUN mkdir -p /data
+
 # Make sure entrypoint scripts are executable
 RUN chmod +x docker/entrypoint-celery.sh docker/entrypoint-celerybeat.sh docker/wait-for-it.sh
 
 # Create a non-root user to run the app
 RUN adduser --disabled-password --gecos "" appuser
-RUN chown -R appuser:appuser /app
+RUN chown -R appuser:appuser /app /data
 USER appuser
 
 # Start command is defined in docker-compose.yml 

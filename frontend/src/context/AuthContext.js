@@ -95,7 +95,7 @@ export const AuthProvider = ({ children }) => {
       
       // Create specific instance for registration request with explicit CORS settings
       const registerAxios = axios.create({
-        baseURL: 'http://localhost:8000/api/v1',
+        baseURL: process.env.REACT_APP_API_URL,
         headers: {
           'Content-Type': 'application/json',
         },
@@ -181,7 +181,7 @@ export const AuthProvider = ({ children }) => {
       
       // Use a dedicated axios instance without auth headers for password reset
       const resetAxios = axios.create({
-        baseURL: 'http://localhost:8000/api/v1',
+        baseURL: process.env.REACT_APP_API_URL,
         headers: {
           'Content-Type': 'application/json',
         },

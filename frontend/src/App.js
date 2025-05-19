@@ -9,6 +9,7 @@ import Header from './components/layout/Header';
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import ForgotPassword from './components/auth/ForgotPassword';
+import Activate from './components/auth/Activate';
 import ProjectDashboard from './components/dashboard/ProjectDashboard';
 import BoardView from './components/board/BoardView';
 import TaskDetail from './components/task/TaskDetail';
@@ -52,6 +53,7 @@ function AppContent() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/activate/:uid/:token" element={<Activate />} />
       
       {/* Protected Routes */}
       <Route path="/" element={

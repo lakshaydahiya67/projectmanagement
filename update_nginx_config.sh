@@ -1,3 +1,7 @@
+#!/bin/bash
+
+# Create a temporary nginx config file
+cat > /tmp/updated_nginx_conf << 'EOF'
 server {
     listen 80;
     server_name localhost;
@@ -43,7 +47,7 @@ server {
         add_header Cache-Control "public, max-age=2592000";
     }
     
-    # Backend static files
+    # Backend static files - serve directly from the mounted volume
     location /backend/static/ {
         alias /usr/share/nginx/html/backend/static/;
         expires 30d;
@@ -78,4 +82,13 @@ server {
         proxy_send_timeout 86400s;     # 24 hours
         proxy_buffering off;           # Disable proxy buffering for WebSockets
     }
-} 
+}
+EOF
+
+# Copy the updated config to the frontend container
+docker cp /tmp/updated_nginx_conf frontend:/etc/nginx/conf.d/default.conf
+
+# Restart nginx in the frontend container
+docker exec -it frontend nginx -s reload
+
+echo "Nginx configuration updated and reloaded!"

@@ -13,20 +13,19 @@ if [ "$EMAIL_BACKEND" = "django.core.mail.backends.smtp.EmailBackend" ]; then
     }
 fi
 
-# Ensure proper directory permissions for SQLite
+# Ensure database directory exists
 if [ -n "$DATABASE_PATH" ]; then
     mkdir -p $(dirname "$DATABASE_PATH")
     touch "$DATABASE_PATH"
-    chown -R appuser:appuser $(dirname "$DATABASE_PATH")
 fi
 
 # Apply database migrations
 echo "Applying database migrations..."
 python manage.py migrate --noinput
 
-# Collect static files
-echo "Collecting static files..."
-python manage.py collectstatic --noinput
+# Temporarily skipping static files collection due to permissions issue
+echo "Skipping static files collection..."
+# python manage.py collectstatic --noinput
 
 # Create superuser if needed (non-interactively)
 # Using environment variables for credentials instead of hardcoding

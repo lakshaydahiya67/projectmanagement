@@ -6,8 +6,6 @@ from django.utils import timezone
 from projects.models import Project, ProjectMember, Board
 from projects.models import BoardViewer
 
-User = get_user_model()
-
 class ProjectConsumer(AsyncWebsocketConsumer):
     """WebSocket consumer for project-level events"""
     

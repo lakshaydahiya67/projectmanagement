@@ -37,19 +37,19 @@ def send_activation_email(user, activation_url):
     
     try:
         # Create the email
-        email = EmailMultiAlternatives(
+        email_message = EmailMultiAlternatives(
             subject,
             text_content,
             django_settings.DEFAULT_FROM_EMAIL,  # Use DEFAULT_FROM_EMAIL instead of EMAIL_HOST_USER
             [user.email]
         )
-        email.attach_alternative(html_content, "text/html")
+        email_message.attach_alternative(html_content, "text/html")
         
         # Log before sending
         logger.info(f"Sending activation email to {user.email} using backend: {django_settings.EMAIL_BACKEND}")
         
         # Send the email
-        email.send(fail_silently=False)
+        email_message.send(fail_silently=False)
         
         logger.info(f"Successfully sent activation email to {user.email}")
         return True
@@ -78,19 +78,19 @@ def send_password_reset_email(user, reset_url):
     
     try:
         # Create the email
-        email = EmailMultiAlternatives(
+        email_message = EmailMultiAlternatives(
             subject,
             text_content,
-            django_settings.DEFAULT_FROM_EMAIL,  # Use DEFAULT_FROM_EMAIL instead of EMAIL_HOST_USER
+            django_settings.DEFAULT_FROM_EMAIL,
             [user.email]
         )
-        email.attach_alternative(html_content, "text/html")
+        email_message.attach_alternative(html_content, "text/html")
         
         # Log before sending
-        logger.info(f"Sending password reset email to {user.email} using backend: {django_settings.EMAIL_BACKEND}")
+        logger.info(f"Sending password reset email to {user.email}")
         
         # Send the email
-        email.send(fail_silently=False)
+        email_message.send(fail_silently=False)
         
         logger.info(f"Successfully sent password reset email to {user.email}")
         return True
@@ -138,6 +138,43 @@ class ActivationEmail(email.ActivationEmail):
         logger.info(f"Generated activation URL: {context['activation_url']}")
         
         return context
+        
+    def send(self, to, **kwargs):
+        context = self.get_context_data()
+        user = context.get('user')
+        
+        subject = f"Activate your {context['site_name']} account"
+        
+        # Render email templates
+        html_content = render_to_string(self.template_name, context)
+        text_content = strip_tags(html_content)  # Strip HTML for plain text version
+        
+        try:
+            # Handle different types of 'to' parameter
+            recipient = to
+            if isinstance(to, list):
+                recipient = to[0]  # Get the first email if it's a list
+            
+            # Create the email message
+            email_message = EmailMultiAlternatives(
+                subject,
+                text_content,
+                django_settings.DEFAULT_FROM_EMAIL,
+                [recipient]  # Always pass as a list with a single email
+            )
+            email_message.attach_alternative(html_content, "text/html")
+            
+            # Log before sending
+            logger.info(f"Sending activation email to {recipient} using backend: {django_settings.EMAIL_BACKEND}")
+            
+            # Send the email
+            email_message.send(fail_silently=False)
+            
+            logger.info(f"Successfully sent activation email to {recipient}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send activation email to {to}: {str(e)}")
+            return False
 
 
 class PasswordResetEmail(email.PasswordResetEmail):
@@ -179,4 +216,41 @@ class PasswordResetEmail(email.PasswordResetEmail):
         
         logger.info(f"Generated reset URL: {context['reset_url']}")
         
-        return context 
+        return context
+        
+    def send(self, to, **kwargs):
+        context = self.get_context_data()
+        user = context.get('user')
+        
+        subject = f"Reset your {context['site_name']} password"
+        
+        # Render email templates
+        html_content = render_to_string(self.template_name, context)
+        text_content = strip_tags(html_content)  # Strip HTML for plain text version
+        
+        try:
+            # Handle different types of 'to' parameter
+            recipient = to
+            if isinstance(to, list):
+                recipient = to[0]  # Get the first email if it's a list
+                
+            # Create the email message
+            email_message = EmailMultiAlternatives(
+                subject,
+                text_content,
+                django_settings.DEFAULT_FROM_EMAIL,
+                [recipient]  # Always pass as a list with a single email
+            )
+            email_message.attach_alternative(html_content, "text/html")
+            
+            # Log before sending
+            logger.info(f"Sending password reset email to {recipient} using backend: {django_settings.EMAIL_BACKEND}")
+            
+            # Send the email
+            email_message.send(fail_silently=False)
+            
+            logger.info(f"Successfully sent password reset email to {recipient}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send password reset email to {to}: {str(e)}")
+            return False 

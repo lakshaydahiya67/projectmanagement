@@ -142,18 +142,10 @@ export const useWebSocket = (url, onMessage) => {
   return { isConnected, error, sendMessage };
 };
 
-// Dynamically determine WebSocket base URL using environment variables
+// Get WebSocket base URL from environment variables
 const getWebSocketBaseUrl = () => {
-  // Use environment variable if available, otherwise calculate from window location
-  if (process.env.REACT_APP_WEBSOCKET_URL) {
-    return process.env.REACT_APP_WEBSOCKET_URL;
-  }
-  
-  // Fallback to dynamic calculation
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const hostname = window.location.hostname;
-  const port = hostname === 'localhost' || hostname === '127.0.0.1' ? '8000' : window.location.port;
-  return `${wsProtocol}//${hostname}:${port}`;
+  // Always use the environment variable
+  return process.env.REACT_APP_WEBSOCKET_URL;
 };
 
 // Specialized hooks for different WebSocket connections
