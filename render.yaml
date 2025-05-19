@@ -8,6 +8,8 @@ services:
       python manage.py migrate
     startCommand: gunicorn projectmanagement.wsgi:application --log-file -
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.12
       - key: DJANGO_SETTINGS_MODULE
         value: projectmanagement.settings
       - key: DJANGO_SECRET_KEY
@@ -38,6 +40,8 @@ services:
       npm run build
     staticPublishPath: ./frontend/build
     envVars:
+      - key: NODE_VERSION
+        value: 18.17.1
       - key: REACT_APP_API_URL
         value: 'https://projectmanagement-backend.onrender.com/api/v1'
       - key: REACT_APP_WS_URL

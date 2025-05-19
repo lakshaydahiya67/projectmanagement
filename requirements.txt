@@ -19,7 +19,10 @@ daphne==4.0.0
 channels-redis==4.1.0
 
 # Database
-# psycopg2-binary==2.9.9  # For PostgreSQL in production (uncomment if needed)
+psycopg2-binary==2.9.9  # For PostgreSQL in production
+
+# WSGI Server
+gunicorn==21.2.0
 
 # Task queue
 celery==5.3.6
