@@ -2,7 +2,15 @@ services:
   - type: web
     name: projectmanagement-backend
     env: python
-
+    plan: free
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput --clear
+      python manage.py migrate
+    startCommand: >-
+      python manage.py create_superuser --noinput --username=admin --email=admin@example.com &&
+      gunicorn projectmanagement.wsgi:application --log-file -
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.12
@@ -47,15 +55,6 @@ services:
         value: '/var/www/media/'
       - key: DJANGO_CSRF_TRUSTED_ORIGINS
         value: 'https://projectmanagement-backend.onrender.com https://projectmanagement.onrender.com'
-    plan: free
-    buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt
-      python manage.py collectstatic --noinput --clear
-      python manage.py migrate
-    startCommand: >-
-      python manage.py create_superuser --noinput --username=admin --email=admin@example.com &&
-      gunicorn projectmanagement.wsgi:application --log-file -
 
   - type: web
     name: projectmanagement-frontend
@@ -78,14 +77,14 @@ services:
         destination: '/index.html'
     plan: free
 
+  - type: redis
+    name: projectmanagement-redis
+    plan: free
+
 databases:
   - name: projectmanagement-db
     databaseName: projectmanagement
     user: projectmanagement
-    plan: free
-
-redis:
-  - name: projectmanagement-redis
     plan: free
 
 crons:
