@@ -86,7 +86,7 @@ class User(AbstractUser):
 class UserPreference(models.Model):
     """User preferences model to store user-specific settings"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='preferences')
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='user_preferences')
     theme_preference = models.CharField(
         max_length=20,
         choices=[('light', 'Light'), ('dark', 'Dark'), ('system', 'System')],

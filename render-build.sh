@@ -79,16 +79,52 @@ DB_STATUS=$(python -c "$PYTHON_CODE")
 
 if [ "$DB_STATUS" = "TABLE_EXISTS_INTEGER_ID" ]; then
     echo "Warning: Database already contains tables with integer IDs, but models use UUIDs."
-    echo "This requires clearing all tables to avoid migration failures."
+    echo "This requires completely dropping and recreating all tables."
     
-    # Since we can't directly drop all tables with privileges on Render.com,
-    # let's use Django's flush command and then manual migration with --fake-initial
-    echo "Flushing database to clear all data..."
-    python manage.py flush --settings=projectmanagement.settings.production --noinput
-    
-    # Since we have integer IDs and need UUIDs, we'll use fake-initial to handle the schema change
-    echo "Setting up migrations with fake-initial..."
-    python manage.py migrate --settings=projectmanagement.settings.production --fake-initial
+    # Connect to database and drop all tables
+    echo "Dropping all tables to prepare for UUID schema..."
+    python - <<EOF
+import dj_database_url
+import psycopg2
+import os
+
+db_url = os.environ.get('DATABASE_URL')
+if not db_url:
+    print("No DATABASE_URL found in environment")
+    exit(1)
+
+config = dj_database_url.parse(db_url)
+conn = psycopg2.connect(
+    dbname=config['NAME'],
+    user=config['USER'],
+    password=config['PASSWORD'],
+    host=config['HOST'],
+    port=config['PORT']
+)
+conn.autocommit = True
+cursor = conn.cursor()
+
+# Disable triggers temporarily
+cursor.execute("SET session_replication_role = 'replica';")
+
+# Get all tables in the public schema
+cursor.execute("""
+    SELECT tablename FROM pg_tables
+    WHERE schemaname = 'public'
+""")
+tables = cursor.fetchall()
+
+# Drop each table cascade to also remove dependencies
+for table in tables:
+    table_name = table[0]
+    print(f"Dropping table {table_name}")
+    cursor.execute(f'DROP TABLE IF EXISTS "{table_name}" CASCADE;')
+
+# Re-enable triggers
+cursor.execute("SET session_replication_role = 'origin';")
+conn.close()
+print("All tables dropped successfully")
+EOF
     
     # Now run migrations on a clean database
     echo "Running migrations on a clean database..."
