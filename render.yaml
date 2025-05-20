@@ -32,10 +32,12 @@ services:
       - key: CELERY_BROKER_URL
         fromService:
           name: projectmanagement-redis
+          type: redis
           property: connectionString
       - key: CELERY_RESULT_BACKEND
         fromService:
           name: projectmanagement-redis
+          type: redis
           property: connectionString
       - key: CORS_ALLOWED_ORIGINS
         value: https://projectmanagement-frontend.onrender.com,http://localhost:3000
@@ -69,8 +71,7 @@ services:
       npm ci --prefer-offline --no-audit --progress=false && \
       npm install -g serve && \
       CI=false npm run build
-    staticPublishPath: ./frontend/build
-    startCommand: 'serve -s build -l $PORT'
+    startCommand: 'cd frontend && serve -s build -l $PORT'
     envVars:
       - key: NODE_VERSION
         value: 18.17.1
