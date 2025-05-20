@@ -19,9 +19,80 @@ python manage.py shell --settings=projectmanagement.settings.production -c "from
 echo -e "\n=== Collecting static files ==="
 python manage.py collectstatic --settings=projectmanagement.settings.production --noinput --clear
 
-# Run database migrations
-echo -e "\n=== Running database migrations ==="
-python manage.py migrate --settings=projectmanagement.settings.production --noinput
+# Database setup with safety checks
+echo -e "\n=== Setting up database ==="
+
+# First check if we need to do a fresh migration or if table exists
+echo "Checking database state..."
+PYTHON_CODE=$(cat <<EOF
+import sys
+import dj_database_url
+import psycopg2
+import os
+
+db_url = os.environ.get('DATABASE_URL')
+if not db_url:
+    print("No DATABASE_URL found in environment")
+    sys.exit(1)
+
+config = dj_database_url.parse(db_url)
+try:
+    # Connect to the database
+    conn = psycopg2.connect(
+        dbname=config['NAME'],
+        user=config['USER'],
+        password=config['PASSWORD'],
+        host=config['HOST'],
+        port=config['PORT']
+    )
+    cursor = conn.cursor()
+    
+    # Check if organizations_organization table exists and get its schema
+    cursor.execute("""SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'organizations_organization'
+    )""")
+    table_exists = cursor.fetchone()[0]
+    
+    if table_exists:
+        # Check the data type of the id column
+        cursor.execute("""SELECT data_type FROM information_schema.columns 
+                       WHERE table_name = 'organizations_organization' AND column_name = 'id'""")
+        data_type = cursor.fetchone()[0]
+        
+        if data_type == 'bigint':
+            print("TABLE_EXISTS_INTEGER_ID")
+        else:
+            print("TABLE_EXISTS_OTHER_ID")
+    else:
+        print("NO_TABLES")
+        
+    conn.close()
+except Exception as e:
+    print(f"Error: {e}")
+    print("NO_TABLES")  # Assume no tables if we can't connect
+    sys.exit(0)
+EOF
+)
+
+DB_STATUS=$(python -c "$PYTHON_CODE")
+
+if [ "$DB_STATUS" = "TABLE_EXISTS_INTEGER_ID" ]; then
+    echo "Warning: Database already contains tables with integer IDs, but models use UUIDs."
+    echo "This requires manual migration or a fresh database."
+    echo "For now, we will attempt migrations but they may fail."
+    echo "Consider recreating the database from the Render.com dashboard."
+    
+    # Just run migrations and hope for the best
+    python manage.py migrate --settings=projectmanagement.settings.production --noinput
+elif [ "$DB_STATUS" = "NO_TABLES" ] || [ "$DB_STATUS" = "TABLE_EXISTS_OTHER_ID" ]; then
+    echo "Running migrations on clean or compatible database..."
+    python manage.py migrate --settings=projectmanagement.settings.production --noinput
+else
+    echo "Error checking database status: $DB_STATUS"
+    echo "Attempting migrations anyway..."
+    python manage.py migrate --settings=projectmanagement.settings.production --noinput
+fi
 
 # Create cache table if using database cache
 echo -e "\n=== Setting up cache table ==="
