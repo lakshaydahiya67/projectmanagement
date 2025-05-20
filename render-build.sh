@@ -12,7 +12,8 @@ pip install -r requirements.txt
 
 # Diagnostic step: Check Django settings, INSTALLED_APPS, and available commands
 echo "=== Checking Django settings and INSTALLED_APPS ==="
-python manage.py shell --settings=projectmanagement.settings.production -c "from django.conf import settings; print(f'DEBUG: {settings.DEBUG}'); print(f'INSTALLED_APPS: {settings.INSTALLED_APPS}'); from django.core.management import get_commands; print(f'Available commands: {list(get_commands().keys())}')"
+python manage.py check --settings=projectmanagement.settings.production
+python manage.py shell --settings=projectmanagement.settings.production -c "from django.conf import settings; print(f'DEBUG: {settings.DEBUG}'); print(f'INSTALLED_APPS: {settings.INSTALLED_APPS}'); print(f'MIDDLEWARE: {settings.MIDDLEWARE}'); from django.core.management import get_commands; print(f'Available commands: {list(get_commands().keys())}')"
 
 # Set up static files
 echo -e "\n=== Collecting static files ==="

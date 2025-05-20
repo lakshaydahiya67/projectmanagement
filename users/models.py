@@ -47,6 +47,24 @@ class User(AbstractUser):
     date_joined = models.DateTimeField(default=timezone.now)
     last_modified = models.DateTimeField(auto_now=True)
     
+    # Fix for related_name clashes
+    groups = models.ManyToManyField(
+        'auth.Group',
+        verbose_name=_('groups'),
+        blank=True,
+        help_text=_('The groups this user belongs to.'),
+        related_name='custom_user_set',
+        related_query_name='custom_user',
+    )
+    user_permissions = models.ManyToManyField(
+        'auth.Permission',
+        verbose_name=_('user permissions'),
+        blank=True,
+        help_text=_('Specific permissions for this user.'),
+        related_name='custom_user_set',
+        related_query_name='custom_user',
+    )
+    
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
     

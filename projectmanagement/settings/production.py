@@ -8,13 +8,14 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# Replace 'from ..settings import *' with a more explicit import mechanism
+# Import important settings from base settings but don't override all
+from django.conf import settings
 from .. import settings as base_settings_module
-for attr_name in dir(base_settings_module):
-    if not attr_name.startswith('_'):  # Import all names not starting with an underscore
-        globals()[attr_name] = getattr(base_settings_module, attr_name)
 
-# Explicitly define INSTALLED_APPS to ensure all required apps are included
+# Import secret key and base settings
+SECRET_KEY = getattr(base_settings_module, 'SECRET_KEY', os.environ.get('DJANGO_SECRET_KEY'))
+
+# Explicitly define core settings
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -38,6 +39,56 @@ INSTALLED_APPS = [
     'analytics',
     'activitylogs',
 ]
+
+# Explicitly define middleware
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+# Template configuration
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
+# User model settings
+AUTH_USER_MODEL = 'users.User'
+
+# Fix related_name clashes for User model
+DJOSER = {
+    'USER_ID_FIELD': 'id',
+    'LOGIN_FIELD': 'email',
+    'USER_CREATE_PASSWORD_RETYPE': True,
+    'SET_PASSWORD_RETYPE': True,
+    'PASSWORD_RESET_CONFIRM_RETYPE': True,
+    'SEND_ACTIVATION_EMAIL': True,
+    'SEND_CONFIRMATION_EMAIL': True,
+    'PASSWORD_RESET_CONFIRM_URL': 'password-reset/confirm/{uid}/{token}',
+    'ACTIVATION_URL': 'activate/{uid}/{token}',
+    'SERIALIZERS': {
+        'user': 'users.serializers.UserSerializer',
+        'current_user': 'users.serializers.UserSerializer',
+    }
+}
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
