@@ -2,6 +2,7 @@
 Email functionality for user management.
 Handles sending activation emails and password reset emails.
 """
+import os
 from django.template.loader import render_to_string
 from django.core.mail import EmailMultiAlternatives
 from django.conf import settings as django_settings
@@ -129,9 +130,16 @@ class ActivationEmail(email.ActivationEmail):
         formatted_url = activation_url_template.format(uid=context['uid'], token=context['token'])
         
         # Create the complete URL
+        # Make sure we're using the correct domain with port for local development
+        domain = context['domain']
+        
+        # If we're running locally on port 8000, ensure the port is included
+        if domain == 'localhost' and os.environ.get('PORT', '8000') != '80':
+            domain = f"localhost:{os.environ.get('PORT', '8000')}"
+        
         context['activation_url'] = '{protocol}://{domain}/{url}'.format(
             protocol=context['protocol'],
-            domain=context['domain'],
+            domain=domain,
             url=formatted_url
         )
         

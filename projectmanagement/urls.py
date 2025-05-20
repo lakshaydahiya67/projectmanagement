@@ -21,6 +21,7 @@ from django.conf.urls.static import static
 from django.http import JsonResponse
 from django.db import connections
 from django.db.utils import OperationalError
+from django.views.generic import TemplateView
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
@@ -87,7 +88,19 @@ urlpatterns = [
     path('api/v1/health/', health_check, name='health_check'),
     path('api/health/', health_check, name='render_health_check'),
     
-    # Include app URLs
+    # Frontend routes serving templates
+    path('', TemplateView.as_view(template_name='dashboard/index.html'), name='home'),
+    path('login/', TemplateView.as_view(template_name='auth/login.html'), name='login'),
+    path('register/', TemplateView.as_view(template_name='auth/register.html'), name='register'),
+    path('dashboard/', TemplateView.as_view(template_name='dashboard/dashboard.html'), name='dashboard'),
+    path('projects/<uuid:project_id>/', TemplateView.as_view(template_name='dashboard/project_detail.html'), name='project_detail'),
+    path('projects/<uuid:project_id>/boards/<uuid:board_id>/', TemplateView.as_view(template_name='board/board.html'), name='board_detail'),
+    path('tasks/<uuid:task_id>/', TemplateView.as_view(template_name='task/task_detail.html'), name='task_detail'),
+    path('organizations/', TemplateView.as_view(template_name='organization/list.html'), name='organizations'),
+    path('organizations/<uuid:org_id>/', TemplateView.as_view(template_name='organization/detail.html'), name='organization_detail'),
+    path('profile/', TemplateView.as_view(template_name='auth/profile.html'), name='profile'),
+    
+    # Include app URLs (API routes)
     path('api/v1/', include(api_patterns)),
     
     # API Documentation
@@ -95,6 +108,7 @@ urlpatterns = [
     re_path(r'^api/redoc/$', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
 ]
 
-# Serve media files in development
+# Serve static and media files in development
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

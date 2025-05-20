@@ -34,7 +34,7 @@ DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() == 'true'
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,backend').split(',')
 
 # Frontend URL for redirects and email links
-FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost')
+SITE_URL = os.environ.get('SITE_URL', 'http://localhost:8000')
 
 
 # Application definition
@@ -201,8 +201,11 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = 'backend/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -268,7 +271,7 @@ DJOSER = {
         'activation': 'users.email.ActivationEmail',
         'confirmation': 'users.email.ActivationEmail',
     },
-    'DOMAIN': os.environ.get('FRONTEND_URL', 'http://localhost').replace('http://', '').replace('https://', ''),
+    'DOMAIN': SITE_URL.replace('http://', '').replace('https://', ''),
     'SITE_NAME': 'Project Management',
     'PASSWORD_RESET_SHOW_EMAIL_NOT_FOUND': False,
     'PASSWORD_RESET_CONFIRM_RETYPE': True,

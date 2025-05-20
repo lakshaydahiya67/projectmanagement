@@ -20,18 +20,18 @@ services:
       retries: 5
     command: ["redis-server", "--appendonly", "yes"]
 
-  # Backend Django service
-  backend:
+  # Django application
+  django:
     build: 
       context: .
-      dockerfile: Dockerfile.backend
-    container_name: backend
+      dockerfile: Dockerfile
+    container_name: django
     restart: unless-stopped
     volumes:
       - sqlite_data:/data
       - static_data:/app/staticfiles
       - media_data:/app/media
-    entrypoint: ["/app/docker/entrypoint-backend.sh"]
+    entrypoint: ["/app/build.sh", "docker"]
     depends_on:
       redis:
         condition: service_healthy
@@ -49,17 +49,10 @@ services:
       - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME:-admin}
       - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-admin@example.com}
       - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-adminpassword}
-    expose:
-      - "8000"
+    ports:
+      - "80:8000"
     networks:
       - app_network
-    # Temporarily disabled healthcheck to debug static files issue
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/"]
-    #   interval: 10s
-    #   timeout: 5s
-    #   retries: 3
-    #   start_period: 30s
     # Set memory and CPU limits
     deploy:
       resources:
@@ -71,15 +64,15 @@ services:
   celery_worker:
     build:
       context: .
-      dockerfile: Dockerfile.celery
+      dockerfile: Dockerfile
     container_name: celery_worker
     restart: unless-stopped
     volumes:
       - sqlite_data:/data
       - media_data:/app/media
-    entrypoint: ["/app/docker/entrypoint-celery.sh"]
+    entrypoint: ["/app/build.sh", "celery"]
     depends_on:
-      backend:
+      django:
         condition: service_started
       redis:
         condition: service_healthy
@@ -104,14 +97,14 @@ services:
   celery_beat:
     build:
       context: .
-      dockerfile: Dockerfile.celery
+      dockerfile: Dockerfile
     container_name: celery_beat
     restart: unless-stopped
     volumes:
       - sqlite_data:/data
-    entrypoint: ["/app/docker/entrypoint-celerybeat.sh"]
+    entrypoint: ["/app/build.sh", "celerybeat"]
     depends_on:
-      backend:
+      django:
         condition: service_started
       redis:
         condition: service_healthy
@@ -130,33 +123,6 @@ services:
       resources:
         limits:
           cpus: '0.1'
-          memory: 128M
-
-  # Frontend React service
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-      args:
-        - REACT_APP_API_URL=${BACKEND_URL}
-        - REACT_APP_WEBSOCKET_URL=${WEBSOCKET_URL}
-    container_name: frontend
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    volumes:
-      - static_data:/usr/share/nginx/html/backend/static
-    depends_on:
-      backend:
-        condition: service_started
-    env_file:
-      - .env
-    networks:
-      - app_network
-    deploy:
-      resources:
-        limits:
-          cpus: '0.2'
           memory: 128M
 
 networks:

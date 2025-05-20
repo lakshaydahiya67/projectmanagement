@@ -30,24 +30,18 @@ This project's documentation is organized into the following sections:
 
 ### Backend
 - Django 4.2.11
+- Django Templates for UI
 - Django REST Framework 3.14.0
 - Django Channels for WebSockets
 - Celery + Redis for background tasks
 - JWT Authentication
-
-### Frontend
-- React 18.2.0
-- React Router 6
-- Tailwind CSS
-- Chart.js for data visualization
-- React Beautiful DND for drag-and-drop
 
 ## 🚀 Deployment on Render.com
 
 ### Prerequisites
 - A Render.com account
 - GitHub repository with your code
-- PostgreSQL database (provided by Render)
+- SQLite3 database (configured in the project)
 - Redis instance (provided by Render)
 
 ### Setup Instructions
@@ -60,14 +54,12 @@ This project's documentation is organized into the following sections:
 
 3. **Deploy to Render**:
    - Connect your GitHub repository to Render
-   - Create a new Web Service for the backend
-   - Create a new Static Site for the frontend
+   - Create a new Web Service
    - Create a Redis instance
-   - Create a PostgreSQL database
 
-4. **Environment Variables for Backend**:
+4. **Environment Variables for Application**:
    ```
-   DATABASE_URL=postgres://user:pass@host:port/dbname
+   DATABASE_PATH=/opt/render/project/src/db.sqlite3
    CELERY_BROKER_URL=redis://:password@host:port
    CELERY_RESULT_BACKEND=redis://:password@host:port
    DJANGO_SETTINGS_MODULE=projectmanagement.settings
@@ -75,31 +67,23 @@ This project's documentation is organized into the following sections:
    DJANGO_DEBUG=False
    ```
 
-5. **Environment Variables for Frontend**:
-   ```
-   REACT_APP_API_URL=https://your-backend-url.onrender.com
-   REACT_APP_WS_URL=wss://your-backend-url.onrender.com/ws
-   ```
+5. **Build Commands**:
+   - `chmod +x ./render-build.sh && ./render-build.sh`
 
-6. **Build Commands**:
-   - Backend: `chmod +x ./render-build.sh && ./render-build.sh`
-   - Frontend: `cd frontend && npm ci && npm run build`
-
-7. **Start Commands**:
-   - Backend: `gunicorn projectmanagement.wsgi:application --log-file -`
-   - Frontend: `serve -s build -l $PORT`
+6. **Start Commands**:
+   - `gunicorn projectmanagement.wsgi:application --log-file -`
 
 ## 🏗️ Project Architecture
 
 ```
-┌────────────────┐     ┌────────────────┐     ┌────────────────┐
-│                │     │                │     │                │
-│  React         │     │  Django        │     │  Celery        │
-│  Frontend      │◄────┤  Backend       │◄────┤  Workers       │
-│                │     │                │     │                │
-└────────────────┘     └────────────────┘     └────────────────┘
-        ▲                      ▲                      ▲
-        │                      │                      │
+┌────────────────┐     ┌────────────────┐
+│                │     │                │
+│  Django        │◄────┤  Celery        │
+│  Application   │     │  Workers       │
+│                │     │                │
+└────────────────┘     └────────────────┘
+        ▲                      ▲
+        │                      │
         └──────────────────────┼──────────────────────┘
                               │
                      ┌────────────────┐
@@ -121,7 +105,6 @@ cd projectmanagement
 
 # Set up environment variables
 cp env-example .env
-cp frontend/.env-example frontend/.env
 
 # Run with Docker
 docker-compose up -d

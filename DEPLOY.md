@@ -43,19 +43,12 @@ DJANGO_SECRET_KEY=your-secret-key-here  # Generate a strong secret key
 PYTHONUNBUFFERED=1
 PYTHONDONTWRITEBYTECODE=1
 
-# Database (Render will provide these)
-DATABASE_URL=postgresql://user:password@host:port/dbname
-
-# Frontend URL (update with your Render URL after deployment)
-FRONTEND_URL=https://your-render-app.onrender.com
+# Database
+DATABASE_PATH=/opt/render/project/src/db.sqlite3
 
 # Email settings (configure as needed)
 EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
 DEFAULT_FROM_EMAIL=noreply@yourdomain.com
-
-# CORS settings
-CORS_ALLOWED_ORIGINS=https://your-render-app.onrender.com
-CSRF_TRUSTED_ORIGINS=https://your-render-app.onrender.com
 ```
 
 ### 4. Deploy the Application
@@ -86,13 +79,12 @@ After the first deployment:
 
 1. Access the admin panel at `https://your-render-app.onrender.com/admin/`
 2. Set up your domain (if needed) in the Render dashboard
-3. Configure email settings for production use
 
 ## Troubleshooting
 
 - **Build Fails**: Check the logs in the Render dashboard
 - **Static Files Not Loading**: Ensure `collectstatic` ran successfully
-- **Database Connection Issues**: Verify your `DATABASE_URL` is correct
+- **Database Issues**: Verify your database file is writable by the application
 
 ## Monitoring
 

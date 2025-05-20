@@ -4,10 +4,9 @@ This project is configured to be deployed on Render.com using their free tier.
 
 ## What Gets Deployed
 
-1. Django Backend
-2. React Frontend
-3. PostgreSQL Database
-4. Redis Instance
+1. Django Application
+2. SQLite3 Database
+3. Redis Instance
 
 ## How to Deploy
 
@@ -35,16 +34,14 @@ This project is configured to be deployed on Render.com using their free tier.
    - You can monitor the progress in the dashboard
 
 4. **Access Your Application**
-   - Once deployment is complete, access your frontend at:
-     `https://projectmanagement-frontend.onrender.com`
-   - The backend API is available at:
-     `https://projectmanagement-backend.onrender.com`
+   - Once deployment is complete, access your application at:
+     `https://projectmanagement.onrender.com`
 
 ## Environment Variables
 
 The following environment variables are automatically set up by Render:
 
-- `DATABASE_URL`: Connection string for PostgreSQL
+- `DATABASE_PATH`: Path to the SQLite3 database file
 - `DJANGO_SECRET_KEY`: Auto-generated secure key
 - `DJANGO_SUPERUSER_PASSWORD`: Auto-generated admin password
 
@@ -55,7 +52,6 @@ If you encounter issues:
 1. Check the service logs in the Render dashboard
 2. Ensure the health check endpoint is accessible
 3. Verify that all required dependencies are in `requirements.txt`
-4. Make sure the frontend build process completes successfully
 
 ## Making Updates
 

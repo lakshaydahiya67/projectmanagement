@@ -1,0 +1,95 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Login - Project Management{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white text-center py-3">
+                    <h4 class="mb-0">Log In to Your Account</h4>
+                </div>
+                <div class="card-body p-4">
+                    <div class="alert alert-danger d-none" id="login-error" role="alert"></div>
+                    
+                    <form id="login-form">
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email Address</label>
+                            <input type="email" class="form-control" id="email" name="email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="remember-me">
+                            <label class="form-check-label" for="remember-me">Remember me</label>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary" id="login-button">
+                                <span class="spinner-border spinner-border-sm d-none" id="login-spinner" role="status" aria-hidden="true"></span>
+                                <span id="login-button-text">Log In</span>
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div class="mt-3 text-center">
+                        <a href="/forgot-password/" class="text-decoration-none">Forgot password?</a>
+                    </div>
+                </div>
+                <div class="card-footer bg-light text-center py-3">
+                    <p class="mb-0">Don't have an account? <a href="/register/" class="text-decoration-none">Sign up</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check if already logged in
+        if (app.isAuthenticated()) {
+            window.location.href = '/dashboard/';
+            return;
+        }
+        
+        // Handle login form submission
+        const loginForm = document.getElementById('login-form');
+        const loginButton = document.getElementById('login-button');
+        const loginButtonText = document.getElementById('login-button-text');
+        const loginSpinner = document.getElementById('login-spinner');
+        const loginError = document.getElementById('login-error');
+        
+        loginForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            
+            // Show loading state
+            loginButton.disabled = true;
+            loginButtonText.textContent = 'Logging in...';
+            loginSpinner.classList.remove('d-none');
+            loginError.classList.add('d-none');
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const success = await app.login(email, password);
+                if (success) {
+                    window.location.href = '/dashboard/';
+                }
+            } catch (error) {
+                loginError.textContent = error.message || 'Login failed. Please check your credentials.';
+                loginError.classList.remove('d-none');
+                
+                // Reset button state
+                loginButton.disabled = false;
+                loginButtonText.textContent = 'Log In';
+                loginSpinner.classList.add('d-none');
+            }
+        });
+    });
+</script>
+{% endblock %} 

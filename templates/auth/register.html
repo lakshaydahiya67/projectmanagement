@@ -1,0 +1,155 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Register - Project Management{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white text-center py-3">
+                    <h4 class="mb-0">Create an Account</h4>
+                </div>
+                <div class="card-body p-4">
+                    <div class="alert alert-danger d-none" id="register-error" role="alert"></div>
+                    
+                    <form id="register-form">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="username" name="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email Address</label>
+                            <input type="email" class="form-control" id="email" name="email" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="first_name" class="form-label">First Name</label>
+                                <input type="text" class="form-control" id="first_name" name="first_name">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="last_name" class="form-label">Last Name</label>
+                                <input type="text" class="form-control" id="last_name" name="last_name">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                            <div class="form-text">Password must be at least 8 characters and include a number and a letter.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirm_password" class="form-label">Confirm Password</label>
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary" id="register-button">
+                                <span class="spinner-border spinner-border-sm d-none" id="register-spinner" role="status" aria-hidden="true"></span>
+                                <span id="register-button-text">Create Account</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer bg-light text-center py-3">
+                    <p class="mb-0">Already have an account? <a href="/login/" class="text-decoration-none">Log in</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check if already logged in
+        if (app.isAuthenticated()) {
+            window.location.href = '/dashboard/';
+            return;
+        }
+        
+        // Handle registration form submission
+        const registerForm = document.getElementById('register-form');
+        const registerButton = document.getElementById('register-button');
+        const registerButtonText = document.getElementById('register-button-text');
+        const registerSpinner = document.getElementById('register-spinner');
+        const registerError = document.getElementById('register-error');
+        
+        registerForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            
+            // Show loading state
+            registerButton.disabled = true;
+            registerButtonText.textContent = 'Creating account...';
+            registerSpinner.classList.remove('d-none');
+            registerError.classList.add('d-none');
+            
+            // Validate passwords match
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm_password').value;
+            
+            if (password !== confirmPassword) {
+                registerError.textContent = 'Passwords do not match';
+                registerError.classList.remove('d-none');
+                registerButton.disabled = false;
+                registerButtonText.textContent = 'Create Account';
+                registerSpinner.classList.add('d-none');
+                return;
+            }
+            
+            // Get form data
+            const userData = {
+                username: document.getElementById('username').value,
+                email: document.getElementById('email').value,
+                first_name: document.getElementById('first_name').value,
+                last_name: document.getElementById('last_name').value,
+                password: password,
+                re_password: confirmPassword  // Djoser requires re_password field
+            };
+            
+            try {
+                const response = await fetch('/api/v1/auth/users/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(userData)
+                });
+                
+                if (response.ok) {
+                    // Redirect to home page with success message
+                    window.location.href = '/?registered=true';
+                } else {
+                    const errorData = await response.json();
+                    // Display error message
+                    let errorMessage = '';
+                    
+                    if (typeof errorData === 'object') {
+                        // Collect all error messages
+                        for (const key in errorData) {
+                            if (Array.isArray(errorData[key])) {
+                                errorMessage += `${key}: ${errorData[key].join(', ')}; `;
+                            } else {
+                                errorMessage += `${key}: ${errorData[key]}; `;
+                            }
+                        }
+                    } else {
+                        errorMessage = 'Registration failed. Please try again.';
+                    }
+                    
+                    registerError.textContent = errorMessage;
+                    registerError.classList.remove('d-none');
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                registerError.textContent = 'An error occurred. Please try again.';
+                registerError.classList.remove('d-none');
+            } finally {
+                // Reset button state
+                registerButton.disabled = false;
+                registerButtonText.textContent = 'Create Account';
+                registerSpinner.classList.add('d-none');
+            }
+        });
+    });
+</script>
+{% endblock %} 
