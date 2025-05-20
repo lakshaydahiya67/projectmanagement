@@ -14,6 +14,31 @@ for attr_name in dir(base_settings_module):
     if not attr_name.startswith('_'):  # Import all names not starting with an underscore
         globals()[attr_name] = getattr(base_settings_module, attr_name)
 
+# Explicitly define INSTALLED_APPS to ensure all required apps are included
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'corsheaders',
+    'rest_framework',
+    'rest_framework.authtoken',
+    'djoser',
+    'channels',
+    'django_filters',
+    'drf_yasg',
+    # Local apps
+    'users',
+    'organizations',
+    'projects',
+    'tasks',
+    'notifications',
+    'analytics',
+    'activitylogs',
+]
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
