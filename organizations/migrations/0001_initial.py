@@ -2,6 +2,7 @@
 
 import django.db.models.deletion
 import django.utils.timezone
+import uuid
 from django.conf import settings
 from django.db import migrations, models
 
@@ -18,7 +19,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Organization',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)),
                 ('name', models.CharField(max_length=100)),
                 ('description', models.TextField(blank=True, null=True)),
                 ('logo', models.ImageField(blank=True, null=True, upload_to='organization_logos/')),
@@ -30,7 +31,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='OrganizationInvitation',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)),
                 ('email', models.EmailField(max_length=254)),
                 ('role', models.CharField(choices=[('admin', 'Admin'), ('manager', 'Manager'), ('member', 'Member')], default='member', max_length=20)),
                 ('token', models.CharField(max_length=255, unique=True)),
@@ -44,7 +45,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='OrganizationMember',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)),
                 ('role', models.CharField(choices=[('admin', 'Admin'), ('manager', 'Manager'), ('member', 'Member')], default='member', max_length=20)),
                 ('joined_at', models.DateTimeField(default=django.utils.timezone.now)),
                 ('organization', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='members', to='organizations.organization')),
