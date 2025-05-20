@@ -79,11 +79,53 @@ DB_STATUS=$(python -c "$PYTHON_CODE")
 
 if [ "$DB_STATUS" = "TABLE_EXISTS_INTEGER_ID" ]; then
     echo "Warning: Database already contains tables with integer IDs, but models use UUIDs."
-    echo "This requires manual migration or a fresh database."
-    echo "For now, we will attempt migrations but they may fail."
-    echo "Consider recreating the database from the Render.com dashboard."
+    echo "This requires clearing all tables to avoid migration failures."
     
-    # Just run migrations and hope for the best
+    # Drop all tables in the database rather than trying to migrate
+    echo "Dropping all tables to ensure clean migration..."
+    python - <<EOF
+import dj_database_url
+import psycopg2
+import os
+
+db_url = os.environ.get('DATABASE_URL')
+config = dj_database_url.parse(db_url)
+
+conn = psycopg2.connect(
+    dbname=config['NAME'],
+    user=config['USER'],
+    password=config['PASSWORD'],
+    host=config['HOST'],
+    port=config['PORT']
+)
+conn.set_isolation_level(0)  # AUTOCOMMIT
+cursor = conn.cursor()
+
+# Disable foreign key constraints while dropping tables
+cursor.execute('SET session_replication_role = replica;')
+
+# Get all tables and drop them
+cursor.execute("""
+    SELECT tablename FROM pg_tables 
+    WHERE schemaname = 'public';
+""")
+tables = cursor.fetchall()
+
+for table in tables:
+    table_name = table[0]
+    print(f"Dropping table: {table_name}")
+    cursor.execute(f'DROP TABLE IF EXISTS "{table_name}" CASCADE;')
+
+# Re-enable foreign key constraints
+cursor.execute('SET session_replication_role = DEFAULT;')
+
+cursor.close()
+conn.close()
+print("All tables dropped successfully!")
+EOF
+    
+    # Now run migrations on a clean database
+    echo "Running migrations on a clean database..."
     python manage.py migrate --settings=projectmanagement.settings.production --noinput
 elif [ "$DB_STATUS" = "NO_TABLES" ] || [ "$DB_STATUS" = "TABLE_EXISTS_OTHER_ID" ]; then
     echo "Running migrations on clean or compatible database..."
