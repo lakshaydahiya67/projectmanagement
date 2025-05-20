@@ -81,48 +81,14 @@ if [ "$DB_STATUS" = "TABLE_EXISTS_INTEGER_ID" ]; then
     echo "Warning: Database already contains tables with integer IDs, but models use UUIDs."
     echo "This requires clearing all tables to avoid migration failures."
     
-    # Drop all tables in the database rather than trying to migrate
-    echo "Dropping all tables to ensure clean migration..."
-    python - <<EOF
-import dj_database_url
-import psycopg2
-import os
-
-db_url = os.environ.get('DATABASE_URL')
-config = dj_database_url.parse(db_url)
-
-conn = psycopg2.connect(
-    dbname=config['NAME'],
-    user=config['USER'],
-    password=config['PASSWORD'],
-    host=config['HOST'],
-    port=config['PORT']
-)
-conn.set_isolation_level(0)  # AUTOCOMMIT
-cursor = conn.cursor()
-
-# Disable foreign key constraints while dropping tables
-cursor.execute('SET session_replication_role = replica;')
-
-# Get all tables and drop them
-cursor.execute("""
-    SELECT tablename FROM pg_tables 
-    WHERE schemaname = 'public';
-""")
-tables = cursor.fetchall()
-
-for table in tables:
-    table_name = table[0]
-    print(f"Dropping table: {table_name}")
-    cursor.execute(f'DROP TABLE IF EXISTS "{table_name}" CASCADE;')
-
-# Re-enable foreign key constraints
-cursor.execute('SET session_replication_role = DEFAULT;')
-
-cursor.close()
-conn.close()
-print("All tables dropped successfully!")
-EOF
+    # Since we can't directly drop all tables with privileges on Render.com,
+    # let's use Django's flush command and then manual migration with --fake-initial
+    echo "Flushing database to clear all data..."
+    python manage.py flush --settings=projectmanagement.settings.production --noinput
+    
+    # Since we have integer IDs and need UUIDs, we'll use fake-initial to handle the schema change
+    echo "Setting up migrations with fake-initial..."
+    python manage.py migrate --settings=projectmanagement.settings.production --fake-initial
     
     # Now run migrations on a clean database
     echo "Running migrations on a clean database..."
