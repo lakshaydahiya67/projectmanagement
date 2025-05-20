@@ -104,9 +104,6 @@ conn = psycopg2.connect(
 conn.autocommit = True
 cursor = conn.cursor()
 
-# Disable triggers temporarily
-cursor.execute("SET session_replication_role = 'replica';")
-
 # Get all tables in the public schema
 cursor.execute("""
     SELECT tablename FROM pg_tables
@@ -120,8 +117,6 @@ for table in tables:
     print(f"Dropping table {table_name}")
     cursor.execute(f'DROP TABLE IF EXISTS "{table_name}" CASCADE;')
 
-# Re-enable triggers
-cursor.execute("SET session_replication_role = 'origin';")
 conn.close()
 print("All tables dropped successfully")
 EOF
