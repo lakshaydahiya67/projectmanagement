@@ -113,3 +113,4 @@ The application uses a centralized `.env` file in the project root directory to 
 - **Static Files**: Static files are served from a shared volume between the backend and frontend containers in Docker
 - **Email Settings**: For local development, you can use the console email backend for testing
 - **Security**: Ensure that sensitive information like secret keys and passwords are not committed to version control
+ 
