@@ -83,8 +83,9 @@ api_patterns = [
 urlpatterns = [
     path('admin/', admin.site.urls),
     
-    # Health check for Docker
+    # Health check for Docker and Render
     path('api/v1/health/', health_check, name='health_check'),
+    path('api/health/', health_check, name='render_health_check'),
     
     # Include app URLs
     path('api/v1/', include(api_patterns)),

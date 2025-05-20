@@ -6,6 +6,7 @@ python-dotenv==1.0.1
 
 # Database
 psycopg2-binary==2.9.9  # For PostgreSQL in production
+dj-database-url==2.1.0  # For database URL parsing
 
 # WSGI Server
 gunicorn==21.2.0

@@ -11,7 +11,7 @@ import os
 import django
 
 # Set up Django settings
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'projectmanagement.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'projectmanagement.settings.production')
 
 # Initialize Django - this must be done before importing any models
 django.setup()
