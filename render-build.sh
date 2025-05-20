@@ -3,6 +3,8 @@
 # Exit on error and print commands as they are executed
 set -ex
 
+export DJANGO_SETTINGS_MODULE="projectmanagement.settings.production"
+
 # Install Python dependencies
 echo "=== Installing Python dependencies ==="
 python -m pip install --upgrade pip
