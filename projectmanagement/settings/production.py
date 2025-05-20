@@ -3,7 +3,16 @@ Production settings for projectmanagement project, used on Render.com.
 """
 import os
 import dj_database_url
-from ..settings import *  # Import base settings
+from pathlib import Path
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+# Replace 'from ..settings import *' with a more explicit import mechanism
+from .. import settings as base_settings_module
+for attr_name in dir(base_settings_module):
+    if not attr_name.startswith('_'):  # Import all names not starting with an underscore
+        globals()[attr_name] = getattr(base_settings_module, attr_name)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
