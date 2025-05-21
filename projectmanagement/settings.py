@@ -31,7 +31,7 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-j8l)e0!vcg6h*n
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,backend').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,.render.com').split(',')
 
 # Frontend URL for redirects and email links
 # Ensure we have a single valid URL for SITE_URL
@@ -309,7 +309,7 @@ DJOSER = {
 }
 
 # CORS settings
-CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost,http://127.0.0.1').split(',')
+CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost,http://127.0.0.1,https://*.onrender.com').split(',')
 CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', str(DEBUG)).lower() == 'true'
 CORS_ALLOW_CREDENTIALS = True
 CORS_PREFLIGHT_MAX_AGE = 86400  # 24 hours
@@ -333,7 +333,7 @@ CORS_ALLOW_HEADERS = [
 'x-csrftoken',
 'x-requested-with',
 ]
-CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost,http://127.0.0.1').split(',')
+CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost,http://127.0.0.1,https://*.onrender.com').split(',')
 
 # Security settings
 USE_X_FORWARDED_HOST = True
