@@ -1,0 +1,14 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Error{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="alert alert-danger" role="alert">
+        <h4 class="alert-heading">An Error Occurred</h4>
+        <p>{{ message|default:"Sorry, an unexpected error occurred or you do not have permission to view this page." }}</p>
+        <hr>
+        <p class="mb-0">Please contact support or try again later. <a href="{% url 'home' %}" class="alert-link">Go to Homepage</a>.</p>
+    </div>
+</div>
+{% endblock %}

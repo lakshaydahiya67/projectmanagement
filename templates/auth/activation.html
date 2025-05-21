@@ -1,0 +1,166 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Account Activation{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Account Activation</h4>
+                </div>
+                <div class="card-body">
+                    <div id="activation-status">
+                        <p class="text-center">Activating your account...</p>
+                        <div class="d-flex justify-content-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Extract UID and token from URL
+        const path = window.location.pathname.replace(/\/$/, ''); // Remove trailing slash if present
+        const pathParts = path.split('/');
+        const uid = pathParts[pathParts.length - 2];
+        const token = pathParts[pathParts.length - 1];
+        
+        // Log the extracted values for debugging
+        console.log('Extracted UID:', uid);
+        console.log('Extracted token:', token);
+        
+        // Get CSRF token
+        const csrfToken = app.getCsrfToken();
+        console.log('CSRF Token:', csrfToken);
+        
+        // Prepare request payload
+        const payload = {
+            uid: uid,
+            token: token
+        };
+        console.log('Request payload:', payload);
+        
+        // Send activation request to Djoser endpoint
+        fetch('/api/v1/auth/users/activation/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify(payload),
+            credentials: 'same-origin' // Include cookies for CSRF protection
+        })
+        .then(response => {
+            console.log('Activation response status:', response.status);
+            const statusElement = document.getElementById('activation-status');
+            
+            if (response.status === 204) {
+                // Success - 204 No Content
+                console.log('Activation successful!');
+                statusElement.innerHTML = `
+                    <div class="alert alert-success" role="alert">
+                        <h4 class="alert-heading">Account Activated!</h4>
+                        <p>Your account has been successfully activated. You can now log in.</p>
+                        <hr>
+                        <p class="mb-0">
+                            <a href="/login/?from=activation" class="btn btn-primary">Go to Login</a>
+                        </p>
+                    </div>
+                `;
+            } else {
+                // Handle error cases
+                console.log('Activation failed with status:', response.status);
+                
+                // Try to parse the response body
+                response.text().then(text => {
+                    console.log('Raw response:', text);
+                    
+                    try {
+                        // Try to parse as JSON if possible
+                        const data = JSON.parse(text);
+                        console.log('Response data:', data);
+                        
+                        let errorMessage = 'There was a problem activating your account.';
+                        
+                        if (data.uid && Array.isArray(data.uid)) {
+                            errorMessage += ' ' + data.uid.join(' ');
+                        } else if (data.uid) {
+                            errorMessage += ' ' + data.uid;
+                        }
+                        
+                        if (data.token && Array.isArray(data.token)) {
+                            errorMessage += ' ' + data.token.join(' ');
+                        } else if (data.token) {
+                            errorMessage += ' ' + data.token;
+                        }
+                        
+                        if (data.detail) {
+                            errorMessage = data.detail;
+                        }
+                        
+                        statusElement.innerHTML = `
+                            <div class="alert alert-danger" role="alert">
+                                <h4 class="alert-heading">Activation Failed</h4>
+                                <p>${errorMessage}</p>
+                                <hr>
+                                <p class="mb-0">
+                                    <a href="/register/" class="btn btn-primary">Register Again</a>
+                                    <a href="/" class="btn btn-secondary ms-2">Return to Home</a>
+                                </p>
+                            </div>
+                        `;
+                    } catch (e) {
+                        // Not JSON, display the raw text if it exists
+                        console.error('Failed to parse response as JSON:', e);
+                        statusElement.innerHTML = `
+                            <div class="alert alert-danger" role="alert">
+                                <h4 class="alert-heading">Activation Failed</h4>
+                                <p>There was a problem activating your account. The activation link may be invalid or expired.</p>
+                                <p>Server response: ${text || 'No response from server'}</p>
+                                <hr>
+                                <p class="mb-0">
+                                    <a href="/" class="btn btn-primary">Return to Home</a>
+                                </p>
+                            </div>
+                        `;
+                    }
+                }).catch(textError => {
+                    console.error('Error reading response body:', textError);
+                    statusElement.innerHTML = `
+                        <div class="alert alert-danger" role="alert">
+                            <h4 class="alert-heading">Activation Failed</h4>
+                            <p>There was a problem activating your account. The activation link may be invalid or expired.</p>
+                            <hr>
+                            <p class="mb-0">
+                                <a href="/" class="btn btn-primary">Return to Home</a>
+                            </p>
+                        </div>
+                    `;
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Activation error:', error);
+            const statusElement = document.getElementById('activation-status');
+            statusElement.innerHTML = `
+                <div class="alert alert-danger" role="alert">
+                    <h4 class="alert-heading">Activation Failed</h4>
+                    <p>There was a problem connecting to the server. Please try again later.</p>
+                    <hr>
+                    <p class="mb-0">
+                        <a href="/" class="btn btn-primary">Return to Home</a>
+                    </p>
+                </div>
+            `;
+        });
+    });
+</script>
+{% endblock %}

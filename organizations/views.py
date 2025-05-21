@@ -1,7 +1,8 @@
 from rest_framework import viewsets, generics, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render, redirect
+from django.db.models import Q
 from django.utils import timezone
 from django.db.models import Q
 import uuid
@@ -196,4 +197,133 @@ class OrganizationInvitationViewSet(viewsets.ModelViewSet):
         # TODO: Resend email invitation
         
         serializer = self.get_serializer(invitation)
+        return Response(serializer.data)
+
+# View for rendering the organization detail HTML page
+def organization_detail_view(request, org_id):
+    organization = get_object_or_404(Organization, id=org_id)
+    # Basic permission check: user must be a member of the organization to view its details
+    # More granular checks can be added if needed (e.g. using IsOrganizationMember permission class)
+    if not OrganizationMember.objects.filter(organization=organization, user=request.user).exists() and not request.user.is_staff:
+        # Or redirect to an error page/dashboard with a message
+        return render(request, 'base/error.html', {'message': 'You do not have permission to view this organization.'}, status=403)
+    
+    return render(request, 'organization/detail.html', {'organization': organization})
+
+
+# View for updating an organization
+def organization_update_view(request, org_id):
+    organization = get_object_or_404(Organization, id=org_id)
+    
+    # Permission check: only organization admins or staff can update the organization
+    member = OrganizationMember.objects.filter(organization=organization, user=request.user).first()
+    if (not member or not member.is_admin) and not request.user.is_staff:
+        return render(request, 'base/error.html', {'message': 'You do not have permission to update this organization.'}, status=403)
+    
+    if request.method == 'POST':
+        # Process the form data
+        name = request.POST.get('name')
+        description = request.POST.get('description')
+        website = request.POST.get('website')
+        
+        if name:  # Name is required
+            organization.name = name
+            organization.description = description
+            organization.website = website
+            organization.save()
+            
+            # Redirect to the organization detail page
+            return redirect('organization_detail', org_id=organization.id)
+    
+    # Render the update form
+    return render(request, 'organization/update.html', {'organization': organization})
+
+
+# View for rendering the organization list HTML page
+def organization_list_view(request):
+    """
+    View function for rendering the organization list page with organizations the user belongs to
+    """
+    if not request.user.is_authenticated:
+        return redirect('login')
+        
+    # Get organizations the user is a member of
+    user_organizations = Organization.objects.filter(
+        members__user=request.user
+    ).distinct()
+    
+    context = {
+        'organizations': user_organizations
+    }
+    
+    return render(request, 'organization/list.html', context)
+
+
+# View for handling organization deletion
+def organization_delete_view(request, org_id):
+    """
+    View function for handling organization deletion
+    Requires POST method and checks if user has admin permissions
+    """
+    organization = get_object_or_404(Organization, id=org_id)
+    
+    # Check if user is an organization admin
+    member = OrganizationMember.objects.filter(
+        organization=organization,
+        user=request.user,
+        is_admin=True
+    ).first()
+    
+    if not member and not request.user.is_staff:
+        return render(request, 'base/error.html', {
+            'message': 'You do not have permission to delete this organization.'
+        }, status=403)
+    
+    # Only process deletion on POST request
+    if request.method == 'POST':
+        # Delete the organization
+        organization.delete()
+        
+        # Redirect to the organizations list
+        from django.contrib import messages
+        messages.success(request, f'Organization "{organization.name}" has been successfully deleted.')
+        return redirect('organizations')
+    
+    # Render confirmation page for GET requests
+    return render(request, 'organization/delete.html', {'organization': organization})
+
+
+# API endpoint for organization projects
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from projects.models import Project
+from projects.serializers import ProjectSerializer
+
+class OrganizationProjectsView(APIView):
+    """
+    API endpoint for retrieving projects belonging to an organization
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request, organization_id):
+        # Check if user is a member of the organization
+        is_member = OrganizationMember.objects.filter(
+            organization_id=organization_id,
+            user=request.user
+        ).exists()
+        
+        if not is_member and not request.user.is_staff:
+            return Response({'detail': 'You do not have permission to view projects in this organization.'}, 
+                            status=status.HTTP_403_FORBIDDEN)
+        
+        # Get all projects for the organization that the user has access to
+        # Either projects the user is a member of, or public projects in the organization
+        projects = Project.objects.filter(
+            organization_id=organization_id
+        ).filter(
+            Q(members__user=request.user) | Q(is_public=True)
+        ).distinct()
+        
+        serializer = ProjectSerializer(projects, many=True)
         return Response(serializer.data)

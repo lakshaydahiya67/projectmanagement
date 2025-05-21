@@ -51,12 +51,14 @@ class ProjectMember(models.Model):
     """Association model between Project and User with roles"""
     OWNER = 'owner'
     ADMIN = 'admin'
+    MANAGER = 'manager'
     MEMBER = 'member'
     VIEWER = 'viewer'
     
     ROLE_CHOICES = [
         (OWNER, 'Owner'),
         (ADMIN, 'Admin'),
+        (MANAGER, 'Manager'),
         (MEMBER, 'Member'),
         (VIEWER, 'Viewer'),
     ]
@@ -79,6 +81,10 @@ class ProjectMember(models.Model):
     @property
     def is_admin(self):
         return self.role == self.ADMIN or self.role == self.OWNER
+        
+    @property
+    def is_manager(self):
+        return self.role == self.MANAGER or self.is_admin
         
 class Board(models.Model):
     """Board model that belongs to a project (Kanban board)"""

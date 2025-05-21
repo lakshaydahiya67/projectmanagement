@@ -1,0 +1,409 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Activity Logs - Project Management{% endblock %}
+
+{% block extra_css %}
+<style>
+    .activity-log-item {
+        padding: 15px;
+        border-left: 3px solid #e9ecef;
+        margin-bottom: 1rem;
+        transition: background-color 0.2s ease;
+    }
+    
+    .activity-log-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .activity-timestamp {
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+    
+    .activity-actor {
+        font-weight: 500;
+    }
+    
+    .activity-entity {
+        font-weight: 500;
+    }
+    
+    .activity-filter-btn.active {
+        background-color: #007bff;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-0">Activity Logs</h1>
+            <p class="text-muted mb-0" id="activity-subtitle">All activity across your projects</p>
+        </div>
+        <div>
+            <button id="refresh-btn" class="btn btn-outline-primary">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+    </div>
+    
+    <!-- Filter Controls -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label for="filter-project" class="form-label">Project</label>
+                    <select class="form-select" id="filter-project">
+                        <option value="">All Projects</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="filter-entity" class="form-label">Entity Type</label>
+                    <select class="form-select" id="filter-entity">
+                        <option value="">All Types</option>
+                        <option value="project">Projects</option>
+                        <option value="board">Boards</option>
+                        <option value="task">Tasks</option>
+                        <option value="comment">Comments</option>
+                        <option value="user">Users</option>
+                        <option value="organization">Organizations</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="filter-action" class="form-label">Action</label>
+                    <select class="form-select" id="filter-action">
+                        <option value="">All Actions</option>
+                        <option value="create">Created</option>
+                        <option value="update">Updated</option>
+                        <option value="delete">Deleted</option>
+                        <option value="assign">Assigned</option>
+                        <option value="move">Moved</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="filter-date" class="form-label">Date Range</label>
+                    <select class="form-select" id="filter-date">
+                        <option value="all">All Time</option>
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                    </select>
+                </div>
+                <div class="col-12 text-end">
+                    <button id="clear-filters-btn" class="btn btn-outline-secondary me-2">Clear Filters</button>
+                    <button id="apply-filters-btn" class="btn btn-primary">Apply Filters</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Activity Log List -->
+    <div class="card">
+        <div class="card-body p-0">
+            <div id="activity-container">
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading activity logs...</p>
+                </div>
+            </div>
+            
+            <!-- Pagination -->
+            <div class="d-flex justify-content-center pt-3 pb-4" id="pagination-container">
+                <!-- Pagination will be inserted here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check authentication
+        if (!app.requireAuth()) return;
+        
+        // Extract project ID from URL if present
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
+        const projectId = pathParts[0] === 'projects' && pathParts.length > 1 ? pathParts[1] : null;
+        
+        // Set up initial filters state
+        window.filters = {
+            project: projectId || '',
+            entity_type: '',
+            action: '',
+            date_range: 'all',
+            page: 1
+        };
+        
+        // Load projects for filter dropdown
+        loadProjects();
+        
+        // Load activities with initial filters
+        loadActivityLogs();
+        
+        // Set up subtitle based on current view
+        if (projectId) {
+            setProjectSpecificSubtitle(projectId);
+        }
+        
+        // Set up event listeners
+        document.getElementById('refresh-btn').addEventListener('click', function() {
+            loadActivityLogs();
+        });
+        
+        document.getElementById('apply-filters-btn').addEventListener('click', function() {
+            applyFilters();
+        });
+        
+        document.getElementById('clear-filters-btn').addEventListener('click', function() {
+            clearFilters();
+        });
+        
+        // If a project filter is already set from the URL, set the dropdown value
+        if (projectId) {
+            document.getElementById('filter-project').value = projectId;
+        }
+    });
+    
+    // Load projects for the filter dropdown
+    async function loadProjects() {
+        try {
+            const response = await app.fetchAPI('/projects/');
+            if (!response.ok) throw new Error('Failed to load projects');
+            
+            const projects = await response.json();
+            
+            const projectSelect = document.getElementById('filter-project');
+            // Keep the first option (All Projects) and add the rest
+            projectSelect.innerHTML = '<option value="">All Projects</option>';
+            
+            projects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.id;
+                option.textContent = project.name;
+                projectSelect.appendChild(option);
+            });
+            
+        } catch (error) {
+            console.error('Error loading projects:', error);
+            app.showNotification('Failed to load projects for filter', 'warning');
+        }
+    }
+    
+    // Set subtitle when viewing project-specific activity
+    async function setProjectSpecificSubtitle(projectId) {
+        try {
+            const response = await app.fetchAPI(`/projects/${projectId}/`);
+            if (!response.ok) throw new Error('Failed to load project details');
+            
+            const project = await response.json();
+            
+            document.getElementById('activity-subtitle').textContent = `Activity for ${project.name}`;
+            
+        } catch (error) {
+            console.error('Error loading project details:', error);
+        }
+    }
+    
+    // Load activity logs based on current filters
+    async function loadActivityLogs() {
+        const activityContainer = document.getElementById('activity-container');
+        activityContainer.innerHTML = `
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Loading activity logs...</p>
+            </div>
+        `;
+        
+        try {
+            // Build query parameters from filters
+            const params = new URLSearchParams();
+            
+            if (window.filters.project) {
+                params.append('project', window.filters.project);
+            }
+            
+            if (window.filters.entity_type) {
+                params.append('entity_type', window.filters.entity_type);
+            }
+            
+            if (window.filters.action) {
+                params.append('action', window.filters.action);
+            }
+            
+            if (window.filters.date_range && window.filters.date_range !== 'all') {
+                params.append('date_range', window.filters.date_range);
+            }
+            
+            if (window.filters.page) {
+                params.append('page', window.filters.page);
+            }
+            
+            const queryString = params.toString() ? `?${params.toString()}` : '';
+            const response = await app.fetchAPI(`/activity-logs/${queryString}`);
+            
+            if (!response.ok) throw new Error('Failed to load activity logs');
+            
+            const result = await response.json();
+            
+            if (!result.results || result.results.length === 0) {
+                activityContainer.innerHTML = `
+                    <div class="text-center py-5">
+                        <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                        <h5>No activity logs found</h5>
+                        <p class="text-muted">Try changing your filters or check back later</p>
+                    </div>
+                `;
+                document.getElementById('pagination-container').innerHTML = '';
+                return;
+            }
+            
+            // Render activity logs
+            renderActivityLogs(result.results);
+            
+            // Render pagination if needed
+            if (result.count > result.page_size) {
+                renderPagination(result.count, result.page_size, window.filters.page);
+            } else {
+                document.getElementById('pagination-container').innerHTML = '';
+            }
+            
+        } catch (error) {
+            console.error('Error loading activity logs:', error);
+            activityContainer.innerHTML = `
+                <div class="alert alert-danger m-3">
+                    Failed to load activity logs: ${error.message}
+                    <button class="btn btn-sm btn-outline-danger ms-3" onclick="loadActivityLogs()">Retry</button>
+                </div>
+            `;
+        }
+    }
+    
+    // Render activity logs
+    function renderActivityLogs(activities) {
+        const activityContainer = document.getElementById('activity-container');
+        activityContainer.innerHTML = '';
+        
+        activities.forEach(activity => {
+            const activityElement = document.createElement('div');
+            activityElement.className = 'activity-log-item';
+            
+            // Format the activity description
+            let description = activity.description;
+            if (activity.target_url) {
+                const entityName = activity.target_name || 'item';
+                description = description.replace(
+                    entityName,
+                    `<a href="${activity.target_url}" class="activity-entity">${entityName}</a>`
+                );
+            }
+            
+            activityElement.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <span class="activity-actor">${activity.actor_name || 'Someone'}</span> ${description}
+                    </div>
+                    <div class="activity-timestamp">${app.formatDate(activity.timestamp)}</div>
+                </div>
+            `;
+            
+            activityContainer.appendChild(activityElement);
+        });
+    }
+    
+    // Render pagination controls
+    function renderPagination(totalItems, pageSize, currentPage) {
+        const totalPages = Math.ceil(totalItems / pageSize);
+        const paginationContainer = document.getElementById('pagination-container');
+        
+        let paginationHtml = '<nav><ul class="pagination">';
+        
+        // Previous button
+        paginationHtml += `
+            <li class="page-item ${currentPage <= 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" data-page="${currentPage - 1}" aria-label="Previous">
+                    <span aria-hidden="true">&laquo;</span>
+                </a>
+            </li>
+        `;
+        
+        // Page numbers
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, startPage + 4);
+        
+        for (let i = startPage; i <= endPage; i++) {
+            paginationHtml += `
+                <li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" data-page="${i}">${i}</a>
+                </li>
+            `;
+        }
+        
+        // Next button
+        paginationHtml += `
+            <li class="page-item ${currentPage >= totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" data-page="${currentPage + 1}" aria-label="Next">
+                    <span aria-hidden="true">&raquo;</span>
+                </a>
+            </li>
+        `;
+        
+        paginationHtml += '</ul></nav>';
+        
+        paginationContainer.innerHTML = paginationHtml;
+        
+        // Add event listeners to pagination links
+        const pageLinks = paginationContainer.querySelectorAll('.page-link');
+        pageLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                const page = parseInt(this.dataset.page, 10);
+                if (isNaN(page) || page < 1 || page > totalPages) return;
+                
+                window.filters.page = page;
+                loadActivityLogs();
+                
+                // Scroll to top of the activity log
+                document.getElementById('activity-container').scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+    }
+    
+    // Apply filters from the form
+    function applyFilters() {
+        window.filters.project = document.getElementById('filter-project').value;
+        window.filters.entity_type = document.getElementById('filter-entity').value;
+        window.filters.action = document.getElementById('filter-action').value;
+        window.filters.date_range = document.getElementById('filter-date').value;
+        window.filters.page = 1; // Reset to first page when filters change
+        
+        loadActivityLogs();
+    }
+    
+    // Clear all filters
+    function clearFilters() {
+        document.getElementById('filter-project').value = '';
+        document.getElementById('filter-entity').value = '';
+        document.getElementById('filter-action').value = '';
+        document.getElementById('filter-date').value = 'all';
+        
+        window.filters = {
+            project: '',
+            entity_type: '',
+            action: '',
+            date_range: 'all',
+            page: 1
+        };
+        
+        loadActivityLogs();
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,227 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}User Profile{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card">
+                <img src="{% if user.profile_picture %}{{ user.profile_picture.url }}{% else %}{% static 'images/default-avatar.png' %}{% endif %}" class="card-img-top" alt="User Avatar" id="userAvatarPreview">
+                <div class="card-body text-center">
+                    <h5 class="card-title" id="userFullName">{{ user.first_name }} {{ user.last_name }}</h5>
+                    <p class="card-text" id="userUsername">@{{ user.username }}</p>
+                    <p class="card-text"><small class="text-muted" id="userEmail">{{ user.email }}</small></p>
+                    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#updateProfilePictureModal">Change Picture</button>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <h3>Profile Information</h3>
+            <form id="profileUpdateForm">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="firstName" class="form-label">First Name</label>
+                    <input type="text" class="form-control" id="firstName" name="first_name" value="{{ user.first_name }}">
+                </div>
+                <div class="mb-3">
+                    <label for="lastName" class="form-label">Last Name</label>
+                    <input type="text" class="form-control" id="lastName" name="last_name" value="{{ user.last_name }}">
+                </div>
+                <div class="mb-3">
+                    <label for="email" class="form-label">Email address</label>
+                    <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" readonly>
+                    <small class="form-text text-muted">Email cannot be changed here.</small>
+                </div>
+                <div class="mb-3">
+                    <label for="bio" class="form-label">Bio</label>
+                    <textarea class="form-control" id="bio" name="bio" rows="3">{{ user.bio }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Update Profile</button>
+            </form>
+
+            <hr class="my-4">
+
+            <h4>Change Password</h4>
+            <form id="passwordChangeForm">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="currentPassword" class="form-label">Current Password</label>
+                    <input type="password" class="form-control" id="currentPassword" name="current_password" required>
+                </div>
+                <div class="mb-3">
+                    <label for="newPassword" class="form-label">New Password</label>
+                    <input type="password" class="form-control" id="newPassword" name="new_password" required>
+                </div>
+                <div class="mb-3">
+                    <label for="confirmNewPassword" class="form-label">Confirm New Password</label>
+                    <input type="password" class="form-control" id="confirmNewPassword" name="new_password_confirm" required>
+                </div>
+                <button type="submit" class="btn btn-warning">Change Password</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Update Profile Picture Modal -->
+<div class="modal fade" id="updateProfilePictureModal" tabindex="-1" aria-labelledby="updateProfilePictureModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="updateProfilePictureModalLabel">Update Profile Picture</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="profilePictureUploadForm" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="profilePictureInput" class="form-label">Choose new picture</label>
+                        <input class="form-control" type="file" id="profilePictureInput" name="avatar" accept="image/*">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Upload</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const profileUpdateForm = document.getElementById('profileUpdateForm');
+    const passwordChangeForm = document.getElementById('passwordChangeForm');
+    const profilePictureUploadForm = document.getElementById('profilePictureUploadForm');
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    // Handle Profile Update
+    profileUpdateForm.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const formData = new FormData(profileUpdateForm);
+        const data = Object.fromEntries(formData.entries());
+
+        try {
+            const response = await fetch('/api/v1/users/me/', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                alert('Profile updated successfully!');
+                document.getElementById('userFullName').textContent = `${result.first_name} ${result.last_name}`;
+            } else {
+                const errorData = await response.json();
+                alert('Error updating profile: ' + (errorData.detail || JSON.stringify(errorData)));
+            }
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            alert('An unexpected error occurred.');
+        }
+    });
+
+    // Handle Password Change
+    passwordChangeForm.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const formData = new FormData(passwordChangeForm);
+        const data = {
+            current_password: formData.get('current_password'),
+            new_password: formData.get('new_password'),
+            re_new_password: formData.get('new_password_confirm')
+        };
+
+        if (data.new_password !== data.re_new_password) {
+            alert('New passwords do not match.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/v1/users/set_password/', { // Djoser endpoint
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                alert('Password changed successfully!');
+                passwordChangeForm.reset();
+            } else {
+                const errorData = await response.json();
+                let errorMessage = 'Error changing password: ';
+                if (errorData.current_password) errorMessage += errorData.current_password.join(' ');
+                if (errorData.new_password) errorMessage += errorData.new_password.join(' ');
+                if (errorData.detail) errorMessage += errorData.detail;
+                if (Object.keys(errorData).length > 0 && errorMessage === 'Error changing password: '){
+                    errorMessage += JSON.stringify(errorData);
+                }
+                alert(errorMessage);
+            }
+        } catch (error) {
+            console.error('Error changing password:', error);
+            alert('An unexpected error occurred.');
+        }
+    });
+
+    // Handle Profile Picture Upload
+    profilePictureUploadForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const formData = new FormData(profilePictureUploadForm);
+
+        try {
+            const response = await fetch('/api/v1/users/me/', { 
+                method: 'PATCH', 
+                headers: {
+                    'X-CSRFToken': csrfToken
+                },
+                body: formData 
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                alert('Profile picture updated successfully!');
+                if (result.avatar) {
+                    document.getElementById('userAvatarPreview').src = result.avatar;
+                }
+                var modal = bootstrap.Modal.getInstance(document.getElementById('updateProfilePictureModal'));
+                modal.hide();
+            } else {
+                const errorData = await response.json();
+                alert('Error updating profile picture: ' + (errorData.detail || JSON.stringify(errorData)));
+            }
+        } catch (error) {
+            console.error('Error updating profile picture:', error);
+            alert('An unexpected error occurred while updating profile picture.');
+        }
+    });
+
+    async function loadInitialProfileData() {
+        try {
+            const response = await fetch('/api/v1/users/me/');
+            if(response.ok) {
+                const data = await response.json();
+                if(data.avatar) {
+                     document.getElementById('userAvatarPreview').src = data.avatar;
+                }
+                 // If bio is also fetched and you have a UserProfile model separate from User
+                // const bioElement = document.getElementById('bio');
+                // if (bioElement && data.profile && data.profile.bio) { 
+                //    bioElement.value = data.profile.bio;
+                // }
+            }
+        } catch (error) {
+            console.warn('Could not fetch initial profile avatar/bio:', error);
+        }
+    }
+    loadInitialProfileData();
+
+});
+</script>
+{% endblock %}

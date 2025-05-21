@@ -50,8 +50,10 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Check if already logged in
-        if (app.isAuthenticated()) {
+        // Check if already logged in - but only redirect if we're not coming from an activation page
+        const fromActivation = new URLSearchParams(window.location.search).get('from') === 'activation';
+        
+        if (!fromActivation && app.isAuthenticated()) {
             window.location.href = '/dashboard/';
             return;
         }

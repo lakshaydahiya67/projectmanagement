@@ -1,0 +1,833 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Analytics Dashboard - Project Management{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-card {
+        transition: transform 0.3s ease;
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .metric-card {
+        border-left: 4px solid #4a6fdc;
+    }
+    
+    .chart-container {
+        height: 300px;
+        position: relative;
+    }
+    
+    .filter-badge {
+        background-color: #e9ecef;
+        padding: 5px 10px;
+        border-radius: 20px;
+        margin-right: 5px;
+        font-size: 0.8rem;
+    }
+    
+    .filter-badge .close {
+        margin-left: 5px;
+        font-size: 0.9rem;
+    }
+</style>
+
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-0">Analytics Dashboard</h1>
+            <p class="text-muted mb-0" id="analytics-subtitle">Performance overview of your projects</p>
+        </div>
+        <div>
+            <div class="dropdown d-inline-block me-2">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="timeRangeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    Last 30 days
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="timeRangeDropdown">
+                    <li><a class="dropdown-item time-range-option" href="#" data-range="7">Last 7 days</a></li>
+                    <li><a class="dropdown-item time-range-option active" href="#" data-range="30">Last 30 days</a></li>
+                    <li><a class="dropdown-item time-range-option" href="#" data-range="90">Last 90 days</a></li>
+                    <li><a class="dropdown-item time-range-option" href="#" data-range="365">Last year</a></li>
+                </ul>
+            </div>
+            <button id="refresh-analytics-btn" class="btn btn-primary">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+    </div>
+    
+    <!-- Project selector (only shows if no project is selected) -->
+    <div id="project-selector-container" class="mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Select a Project</h5>
+                <select class="form-select" id="project-selector">
+                    <option value="">All Projects</option>
+                    <!-- Project options will be loaded here -->
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Active filters display -->
+    <div id="active-filters" class="mb-4 d-none">
+        <div class="d-flex align-items-center">
+            <div class="me-2">
+                <strong>Active Filters:</strong>
+            </div>
+            <div id="filter-badges">
+                <!-- Filter badges will be inserted here -->
+            </div>
+            <button id="clear-all-filters" class="btn btn-sm btn-outline-secondary ms-2">
+                Clear All
+            </button>
+        </div>
+    </div>
+    
+    <!-- Key Metrics -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card stats-card h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">Total Tasks</h5>
+                    <h2 id="total-tasks-metric">--</h2>
+                    <p class="card-text text-muted mb-0" id="tasks-change">
+                        <span id="tasks-change-icon"><i class="fas fa-minus"></i></span>
+                        <span id="tasks-change-value">--</span> vs previous period
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card stats-card h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">Completed Tasks</h5>
+                    <h2 id="completed-tasks-metric">--</h2>
+                    <p class="card-text text-muted mb-0" id="completed-change">
+                        <span id="completed-change-icon"><i class="fas fa-minus"></i></span>
+                        <span id="completed-change-value">--</span> vs previous period
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card stats-card h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">Completion Rate</h5>
+                    <h2 id="completion-rate-metric">--%</h2>
+                    <p class="card-text text-muted mb-0" id="rate-change">
+                        <span id="rate-change-icon"><i class="fas fa-minus"></i></span>
+                        <span id="rate-change-value">--</span> vs previous period
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card stats-card h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">Avg. Time to Complete</h5>
+                    <h2 id="avg-time-metric">-- days</h2>
+                    <p class="card-text text-muted mb-0" id="time-change">
+                        <span id="time-change-icon"><i class="fas fa-minus"></i></span>
+                        <span id="time-change-value">--</span> vs previous period
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Charts -->
+    <div class="row mb-4">
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Tasks by Status</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="tasks-by-status-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Tasks by Priority</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="tasks-by-priority-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-8 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Task Completion Trend</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="task-completion-trend-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Tasks by Assignee</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="tasks-by-assignee-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Task Breakdown Table -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Task Breakdown</h5>
+            <button class="btn btn-sm btn-outline-secondary" id="download-csv-btn">
+                <i class="fas fa-download"></i> Export CSV
+            </button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Project</th>
+                            <th>Status</th>
+                            <th>Total Tasks</th>
+                            <th>High Priority</th>
+                            <th>Medium Priority</th>
+                            <th>Low Priority</th>
+                            <th>Avg. Completion Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="task-breakdown-table-body">
+                        <tr>
+                            <td colspan="7" class="text-center py-3">Loading task breakdown...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Chart objects
+    let statusChart = null;
+    let priorityChart = null;
+    let trendChart = null;
+    let assigneeChart = null;
+    
+    // Settings
+    let selectedProject = '';
+    let timeRange = 30;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check authentication
+        if (!app.requireAuth()) return;
+        
+        // Extract project ID from URL if present
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
+        if (pathParts[0] === 'analytics' && pathParts.length > 1) {
+            selectedProject = pathParts[1];
+        }
+        
+        // Set up project selector
+        setupProjectSelector();
+        
+        // Load analytics data
+        loadAnalyticsData();
+        
+        // Set up event listeners
+        document.getElementById('refresh-analytics-btn').addEventListener('click', function() {
+            loadAnalyticsData();
+        });
+        
+        document.getElementById('project-selector').addEventListener('change', function() {
+            selectedProject = this.value;
+            updateFilterBadges();
+            loadAnalyticsData();
+        });
+        
+        document.getElementById('clear-all-filters').addEventListener('click', function() {
+            selectedProject = '';
+            document.getElementById('project-selector').value = '';
+            updateFilterBadges();
+            loadAnalyticsData();
+        });
+        
+        // Set up time range selector
+        document.querySelectorAll('.time-range-option').forEach(option => {
+            option.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Update active class
+                document.querySelectorAll('.time-range-option').forEach(opt => {
+                    opt.classList.remove('active');
+                });
+                this.classList.add('active');
+                
+                // Update dropdown button text
+                const range = parseInt(this.dataset.range, 10);
+                document.getElementById('timeRangeDropdown').textContent = `Last ${range} days`;
+                
+                // Update time range and reload data
+                timeRange = range;
+                loadAnalyticsData();
+            });
+        });
+        
+        // Set up CSV download
+        document.getElementById('download-csv-btn').addEventListener('click', function() {
+            downloadTaskBreakdownCSV();
+        });
+    });
+    
+    // Setup project selector
+    async function setupProjectSelector() {
+        try {
+            const response = await app.fetchAPI('/projects/');
+            if (!response.ok) throw new Error('Failed to load projects');
+            
+            const projects = await response.json();
+            
+            const projectSelector = document.getElementById('project-selector');
+            // Keep the first option (All Projects) and add the rest
+            projectSelector.innerHTML = '<option value="">All Projects</option>';
+            
+            projects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.id;
+                option.textContent = project.name;
+                projectSelector.appendChild(option);
+            });
+            
+            // Set selected project if specified in URL
+            if (selectedProject) {
+                projectSelector.value = selectedProject;
+            }
+            
+            // Update subtitle and filters based on selected project
+            updateFilterBadges();
+            
+        } catch (error) {
+            console.error('Error loading projects:', error);
+            app.showNotification('Failed to load projects', 'danger');
+        }
+    }
+    
+    // Update filter badges
+    function updateFilterBadges() {
+        const activeFilters = document.getElementById('active-filters');
+        const filterBadges = document.getElementById('filter-badges');
+        
+        // Clear existing badges
+        filterBadges.innerHTML = '';
+        
+        let hasFilters = false;
+        
+        // Add project filter badge if a project is selected
+        if (selectedProject) {
+            hasFilters = true;
+            
+            // Get project name from select dropdown
+            const projectSelector = document.getElementById('project-selector');
+            const selectedOption = projectSelector.options[projectSelector.selectedIndex];
+            const projectName = selectedOption ? selectedOption.textContent : 'Selected Project';
+            
+            const badge = document.createElement('div');
+            badge.className = 'filter-badge';
+            badge.innerHTML = `
+                Project: ${projectName}
+                <button type="button" class="btn-close btn-close-sm ms-2" aria-label="Remove filter"></button>
+            `;
+            
+            badge.querySelector('.btn-close').addEventListener('click', function() {
+                selectedProject = '';
+                document.getElementById('project-selector').value = '';
+                updateFilterBadges();
+                loadAnalyticsData();
+            });
+            
+            filterBadges.appendChild(badge);
+        }
+        
+        // Show or hide the active filters section
+        if (hasFilters) {
+            activeFilters.classList.remove('d-none');
+        } else {
+            activeFilters.classList.add('d-none');
+        }
+        
+        // Update subtitle
+        updateSubtitle();
+    }
+    
+    // Update subtitle based on selected project
+    async function updateSubtitle() {
+        const subtitle = document.getElementById('analytics-subtitle');
+        
+        if (selectedProject) {
+            try {
+                const response = await app.fetchAPI(`/projects/${selectedProject}/`);
+                if (!response.ok) throw new Error('Failed to load project details');
+                
+                const project = await response.json();
+                subtitle.textContent = `Analytics for ${project.name}`;
+                
+            } catch (error) {
+                console.error('Error loading project details:', error);
+                subtitle.textContent = 'Project analytics';
+            }
+        } else {
+            subtitle.textContent = 'Performance overview of your projects';
+        }
+    }
+    
+    // Load analytics data
+    async function loadAnalyticsData() {
+        // Show loading state
+        document.getElementById('total-tasks-metric').textContent = '--';
+        document.getElementById('completed-tasks-metric').textContent = '--';
+        document.getElementById('completion-rate-metric').textContent = '--%';
+        document.getElementById('avg-time-metric').textContent = '-- days';
+        
+        document.getElementById('tasks-change-value').textContent = '--';
+        document.getElementById('completed-change-value').textContent = '--';
+        document.getElementById('rate-change-value').textContent = '--';
+        document.getElementById('time-change-value').textContent = '--';
+        
+        document.getElementById('task-breakdown-table-body').innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center py-3">
+                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    Loading task breakdown...
+                </td>
+            </tr>
+        `;
+        
+        try {
+            // Build query parameters
+            const params = new URLSearchParams();
+            params.append('timeRange', timeRange.toString());
+            
+            if (selectedProject) {
+                params.append('project', selectedProject);
+            }
+            
+            // Load analytics data
+            const queryString = params.toString() ? `?${params.toString()}` : '';
+            const response = await app.fetchAPI(`/analytics/dashboard${queryString}`);
+            
+            if (!response.ok) throw new Error('Failed to load analytics data');
+            
+            const data = await response.json();
+            
+            // Update metrics
+            updateMetrics(data.metrics);
+            
+            // Update charts
+            updateCharts(data.charts);
+            
+            // Update task breakdown table
+            updateTaskBreakdownTable(data.taskBreakdown);
+            
+        } catch (error) {
+            console.error('Error loading analytics data:', error);
+            app.showNotification('Failed to load analytics data: ' + error.message, 'danger');
+            
+            // Show error state in table
+            document.getElementById('task-breakdown-table-body').innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center py-3 text-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Failed to load data. Please try again later.
+                    </td>
+                </tr>
+            `;
+        }
+    }
+    
+    // Update metrics
+    function updateMetrics(metrics) {
+        const totalTasks = document.getElementById('total-tasks-metric');
+        const completedTasks = document.getElementById('completed-tasks-metric');
+        const completionRate = document.getElementById('completion-rate-metric');
+        const avgTime = document.getElementById('avg-time-metric');
+        
+        totalTasks.textContent = metrics.totalTasks.current.toLocaleString();
+        completedTasks.textContent = metrics.completedTasks.current.toLocaleString();
+        completionRate.textContent = `${Math.round(metrics.completionRate.current)}%`;
+        avgTime.textContent = `${Math.round(metrics.avgTimeToComplete.current)} days`;
+        
+        // Update change indicators
+        updateChangeIndicator('tasks', metrics.totalTasks.change);
+        updateChangeIndicator('completed', metrics.completedTasks.change);
+        updateChangeIndicator('rate', metrics.completionRate.change);
+        updateChangeIndicator('time', metrics.avgTimeToComplete.change, true);
+    }
+    
+    // Update change indicator
+    function updateChangeIndicator(id, change, inverseGood = false) {
+        const changeValue = document.getElementById(`${id}-change-value`);
+        const changeIcon = document.getElementById(`${id}-change-icon`);
+        const changeContainer = document.getElementById(`${id}-change`);
+        
+        // Format the change value
+        const absChange = Math.abs(change);
+        let formattedChange = '';
+        
+        if (id === 'rate') {
+            formattedChange = `${absChange.toFixed(1)}%`;
+        } else if (id === 'time') {
+            formattedChange = `${absChange.toFixed(1)} days`;
+        } else {
+            formattedChange = absChange.toLocaleString();
+        }
+        
+        changeValue.textContent = formattedChange;
+        
+        // Set the icon and color based on whether the change is positive or negative
+        if (change > 0) {
+            const isGood = inverseGood ? false : true;
+            changeIcon.innerHTML = `<i class="fas fa-arrow-up"></i>`;
+            changeContainer.className = `card-text mb-0 ${isGood ? 'text-success' : 'text-danger'}`;
+        } else if (change < 0) {
+            const isGood = inverseGood ? true : false;
+            changeIcon.innerHTML = `<i class="fas fa-arrow-down"></i>`;
+            changeContainer.className = `card-text mb-0 ${isGood ? 'text-success' : 'text-danger'}`;
+        } else {
+            changeIcon.innerHTML = `<i class="fas fa-minus"></i>`;
+            changeContainer.className = 'card-text text-muted mb-0';
+        }
+    }
+    
+    // Update charts
+    function updateCharts(chartData) {
+        // Tasks by Status chart
+        updateStatusChart(chartData.tasksByStatus);
+        
+        // Tasks by Priority chart
+        updatePriorityChart(chartData.tasksByPriority);
+        
+        // Task Completion Trend chart
+        updateTrendChart(chartData.completionTrend);
+        
+        // Tasks by Assignee chart
+        updateAssigneeChart(chartData.tasksByAssignee);
+    }
+    
+    // Update Status Chart
+    function updateStatusChart(data) {
+        const ctx = document.getElementById('tasks-by-status-chart').getContext('2d');
+        
+        if (statusChart) {
+            statusChart.destroy();
+        }
+        
+        statusChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Tasks',
+                    data: data.values,
+                    backgroundColor: data.colors || generateColors(data.labels.length),
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `Tasks: ${context.raw}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Update Priority Chart
+    function updatePriorityChart(data) {
+        const ctx = document.getElementById('tasks-by-priority-chart').getContext('2d');
+        
+        if (priorityChart) {
+            priorityChart.destroy();
+        }
+        
+        priorityChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    data: data.values,
+                    backgroundColor: [
+                        '#dc3545', // High - Red
+                        '#ffc107', // Medium - Yellow
+                        '#17a2b8'  // Low - Teal
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.raw;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${context.label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Update Trend Chart
+    function updateTrendChart(data) {
+        const ctx = document.getElementById('task-completion-trend-chart').getContext('2d');
+        
+        if (trendChart) {
+            trendChart.destroy();
+        }
+        
+        trendChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Created',
+                    data: data.created,
+                    borderColor: '#4a6fdc',
+                    backgroundColor: 'rgba(74, 111, 220, 0.1)',
+                    fill: true,
+                    tension: 0.1
+                }, {
+                    label: 'Completed',
+                    data: data.completed,
+                    borderColor: '#28a745',
+                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                    fill: true,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Update Assignee Chart
+    function updateAssigneeChart(data) {
+        const ctx = document.getElementById('tasks-by-assignee-chart').getContext('2d');
+        
+        if (assigneeChart) {
+            assigneeChart.destroy();
+        }
+        
+        assigneeChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    data: data.values,
+                    backgroundColor: generateColors(data.labels.length),
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        display: data.labels.length <= 6
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.raw;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${context.label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Update Task Breakdown Table
+    function updateTaskBreakdownTable(data) {
+        const tableBody = document.getElementById('task-breakdown-table-body');
+        tableBody.innerHTML = '';
+        
+        if (!data || data.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center py-3">No task data available</td>
+                </tr>
+            `;
+            return;
+        }
+        
+        data.forEach(row => {
+            const tr = document.createElement('tr');
+            
+            tr.innerHTML = `
+                <td>${row.project}</td>
+                <td>${row.status}</td>
+                <td>${row.totalTasks}</td>
+                <td>${row.highPriority}</td>
+                <td>${row.mediumPriority}</td>
+                <td>${row.lowPriority}</td>
+                <td>${row.avgCompletionTime ? row.avgCompletionTime.toFixed(1) + ' days' : 'N/A'}</td>
+            `;
+            
+            tableBody.appendChild(tr);
+        });
+    }
+    
+    // Generate colors for charts
+    function generateColors(count) {
+        const baseColors = [
+            '#4a6fdc', // Blue
+            '#28a745', // Green
+            '#fd7e14', // Orange
+            '#6610f2', // Purple
+            '#e83e8c', // Pink
+            '#17a2b8', // Teal
+            '#6c757d', // Gray
+            '#20c997', // Cyan
+            '#d63384', // Magenta
+            '#fd7e14'  // Orange
+        ];
+        
+        const colors = [];
+        for (let i = 0; i < count; i++) {
+            colors.push(baseColors[i % baseColors.length]);
+        }
+        
+        return colors;
+    }
+    
+    // Download task breakdown as CSV
+    function downloadTaskBreakdownCSV() {
+        // Get table data
+        const table = document.querySelector('table');
+        let csv = [];
+        
+        // Get headers
+        const headers = [];
+        const headerCells = table.querySelectorAll('thead th');
+        headerCells.forEach(cell => {
+            headers.push(cell.textContent);
+        });
+        csv.push(headers.join(','));
+        
+        // Get rows
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            const rowData = [];
+            const cells = row.querySelectorAll('td');
+            
+            if (cells.length === 1) return; // Skip "no data" row
+            
+            cells.forEach(cell => {
+                // Remove commas from values and wrap in quotes if needed
+                let value = cell.textContent.trim();
+                if (value.includes(',')) {
+                    value = `"${value}"`;
+                }
+                rowData.push(value);
+            });
+            
+            csv.push(rowData.join(','));
+        });
+        
+        // Generate CSV file
+        const csvContent = "data:text/csv;charset=utf-8," + csv.join('\n');
+        const encodedUri = encodeURI(csvContent);
+        
+        // Create download link
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `task_breakdown_${new Date().toISOString().slice(0,10)}.csv`);
+        document.body.appendChild(link);
+        
+        // Trigger download
+        link.click();
+        
+        // Clean up
+        document.body.removeChild(link);
+    }
+</script>
+{% endblock %}

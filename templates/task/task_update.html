@@ -1,0 +1,306 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Update Task - Project Management{% endblock %}
+
+{% block extra_css %}
+<style>
+    .task-label {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        margin-right: 5px;
+        margin-bottom: 5px;
+        font-size: 0.75rem;
+    }
+    .priority-high {
+        border-left: 4px solid var(--danger-color);
+    }
+    .priority-medium {
+        border-left: 4px solid var(--warning-color);
+    }
+    .priority-low {
+        border-left: 4px solid var(--info-color);
+    }
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    .form-label {
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/dashboard/">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'project_detail' project.id %}">{{ project.name }}</a></li>
+            <li class="breadcrumb-item"><a href="/projects/{{ project.id }}/tasks/{{ task.id }}/">{{ task.title }}</a></li>
+            <li class="breadcrumb-item active">Update Task</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Update Task: {{ task.title }}</h5>
+                </div>
+                <div class="card-body">
+                    <div id="task-form-errors" class="alert alert-danger d-none"></div>
+                    
+                    <form id="task-update-form">
+                        <div class="form-group">
+                            <label for="task-title" class="form-label">Task Title *</label>
+                            <input type="text" class="form-control" id="task-title" name="title" value="{{ task.title }}" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="task-description" class="form-label">Description</label>
+                            <textarea class="form-control" id="task-description" name="description" rows="4">{{ task.description }}</textarea>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="task-board" class="form-label">Board *</label>
+                                    <select class="form-select" id="task-board" name="board" required>
+                                        <option value="">Select a board</option>
+                                        {% for board in boards %}
+                                        <option value="{{ board.id }}" {% if board.id == task.column.board.id %}selected{% endif %}>{{ board.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="task-column" class="form-label">Column *</label>
+                                    <select class="form-select" id="task-column" name="column" required>
+                                        <option value="">Select a board first</option>
+                                        {% for column in columns %}
+                                        {% if column.board.id == task.column.board.id %}
+                                        <option value="{{ column.id }}" {% if column.id == task.column.id %}selected{% endif %}>{{ column.name }}</option>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="task-priority" class="form-label">Priority</label>
+                                    <select class="form-select" id="task-priority" name="priority">
+                                        <option value="low" {% if task.priority == 'low' %}selected{% endif %}>Low</option>
+                                        <option value="medium" {% if task.priority == 'medium' %}selected{% endif %}>Medium</option>
+                                        <option value="high" {% if task.priority == 'high' %}selected{% endif %}>High</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="task-due-date" class="form-label">Due Date</label>
+                                    <input type="date" class="form-control" id="task-due-date" name="due_date" value="{{ task.due_date|date:'Y-m-d' }}">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="task-status" class="form-label">Status</label>
+                            <select class="form-select" id="task-status" name="status">
+                                <option value="To Do" {% if task.status == 'To Do' %}selected{% endif %}>To Do</option>
+                                <option value="In Progress" {% if task.status == 'In Progress' %}selected{% endif %}>In Progress</option>
+                                <option value="In Review" {% if task.status == 'In Review' %}selected{% endif %}>In Review</option>
+                                <option value="Completed" {% if task.status == 'Completed' %}selected{% endif %}>Completed</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="task-assignees" class="form-label">Assignees</label>
+                            <select class="form-select" id="task-assignees" name="assignees" multiple>
+                                {% for member in project_members %}
+                                <option value="{{ member.user.id }}" {% if member.user in task.assignees.all %}selected{% endif %}>{{ member.user.get_full_name|default:member.user.username }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">Hold Ctrl (or Cmd on Mac) to select multiple assignees</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="task-labels" class="form-label">Labels</label>
+                            <select class="form-select" id="task-labels" name="labels" multiple>
+                                {% for label in labels %}
+                                <option value="{{ label.id }}" {% if label in task.labels.all %}selected{% endif %} style="background-color: {{ label.color }};">{{ label.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">Hold Ctrl (or Cmd on Mac) to select multiple labels</small>
+                        </div>
+                        
+                        <div class="mt-4 d-flex justify-content-between">
+                            <a href="/projects/{{ project.id }}/tasks/{{ task.id }}/" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary" id="task-submit-btn">
+                                <span class="spinner-border spinner-border-sm d-none" id="task-spinner" role="status" aria-hidden="true"></span>
+                                <span id="task-btn-text">Update Task</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize variables
+        const taskForm = document.getElementById('task-update-form');
+        const taskBoardSelect = document.getElementById('task-board');
+        const taskColumnSelect = document.getElementById('task-column');
+        const taskSubmitBtn = document.getElementById('task-submit-btn');
+        const taskSpinner = document.getElementById('task-spinner');
+        const taskBtnText = document.getElementById('task-btn-text');
+        const taskFormErrors = document.getElementById('task-form-errors');
+        
+        // Store columns by board ID for easy filtering
+        const columnsByBoard = {};
+        
+        // Initialize columns data
+        {% for column in columns %}
+        if (!columnsByBoard['{{ column.board.id }}']) {
+            columnsByBoard['{{ column.board.id }}'] = [];
+        }
+        columnsByBoard['{{ column.board.id }}'].push({
+            id: '{{ column.id }}',
+            name: '{{ column.name }}'
+        });
+        {% endfor %}
+        
+        // Update columns when board changes
+        taskBoardSelect.addEventListener('change', function() {
+            const boardId = this.value;
+            
+            // Clear current options
+            taskColumnSelect.innerHTML = '';
+            
+            if (boardId) {
+                // Enable the column select
+                taskColumnSelect.disabled = false;
+                
+                // Add columns for the selected board
+                const columns = columnsByBoard[boardId] || [];
+                
+                if (columns.length > 0) {
+                    columns.forEach(column => {
+                        const option = document.createElement('option');
+                        option.value = column.id;
+                        option.textContent = column.name;
+                        taskColumnSelect.appendChild(option);
+                    });
+                } else {
+                    // No columns for this board
+                    const option = document.createElement('option');
+                    option.value = '';
+                    option.textContent = 'No columns available for this board';
+                    taskColumnSelect.appendChild(option);
+                }
+            } else {
+                // Disable the column select if no board is selected
+                taskColumnSelect.disabled = true;
+                
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'Select a board first';
+                taskColumnSelect.appendChild(option);
+            }
+        });
+        
+        // Handle form submission
+        taskForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            
+            // Show loading state
+            taskSubmitBtn.disabled = true;
+            taskSpinner.classList.remove('d-none');
+            taskBtnText.textContent = 'Updating...';
+            taskFormErrors.classList.add('d-none');
+            
+            // Get form data
+            const formData = new FormData(taskForm);
+            const taskData = {
+                title: formData.get('title'),
+                description: formData.get('description'),
+                column: formData.get('column'),
+                priority: formData.get('priority'),
+                status: formData.get('status'),
+                due_date: formData.get('due_date') || null,
+                assignees: Array.from(taskForm.elements['assignees'].selectedOptions).map(option => option.value),
+                labels: Array.from(taskForm.elements['labels'].selectedOptions).map(option => option.value)
+            };
+            
+            try {
+                // Get CSRF token
+                const csrftoken = app.getCsrfToken();
+                
+                // Send API request to update task
+                const response = await fetch(`/api/v1/tasks/{{ task.id }}/`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken
+                    },
+                    body: JSON.stringify(taskData),
+                    credentials: 'same-origin'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    // Redirect to the task detail page
+                    window.location.href = '/projects/{{ project.id }}/tasks/{{ task.id }}/';
+                } else {
+                    // Handle error response
+                    const errorData = await response.json();
+                    let errorMessage = 'Failed to update task. Please check your inputs and try again.';
+                    
+                    if (errorData) {
+                        const errors = [];
+                        for (const [key, value] of Object.entries(errorData)) {
+                            if (Array.isArray(value)) {
+                                errors.push(`${key}: ${value.join(', ')}`);
+                            } else {
+                                errors.push(`${key}: ${value}`);
+                            }
+                        }
+                        
+                        if (errors.length > 0) {
+                            errorMessage = errors.join('<br>');
+                        }
+                    }
+                    
+                    // Display error message
+                    taskFormErrors.innerHTML = errorMessage;
+                    taskFormErrors.classList.remove('d-none');
+                    
+                    // Reset button state
+                    taskSubmitBtn.disabled = false;
+                    taskSpinner.classList.add('d-none');
+                    taskBtnText.textContent = 'Update Task';
+                }
+            } catch (error) {
+                console.error('Error updating task:', error);
+                
+                // Display error message
+                taskFormErrors.innerHTML = 'An unexpected error occurred. Please try again.';
+                taskFormErrors.classList.remove('d-none');
+                
+                // Reset button state
+                taskSubmitBtn.disabled = false;
+                taskSpinner.classList.add('d-none');
+                taskBtnText.textContent = 'Update Task';
+            }
+        });
+    });
+</script>
+{% endblock %}

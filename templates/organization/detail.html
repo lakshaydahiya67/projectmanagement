@@ -1,0 +1,281 @@
+
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}{{ organization.name }} Details{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-3">
+        <div class="col-md-8">
+            <h2>{{ organization.name }}</h2>
+            <p>{{ organization.description }}</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{% url 'organization_update' organization.id %}" class="btn btn-primary">Edit Organization</a>
+            {% if request.user.is_staff or request.user == organization.owner %}
+                 <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteOrgModal">
+                    Delete Organization
+                </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-3" id="orgDetailTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="projects-tab" data-bs-toggle="tab" data-bs-target="#projects" type="button" role="tab" aria-controls="projects" aria-selected="true">Projects</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="members-tab" data-bs-toggle="tab" data-bs-target="#members" type="button" role="tab" aria-controls="members" aria-selected="false">Members</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings" type="button" role="tab" aria-controls="settings" aria-selected="false">Settings</button>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="orgDetailTabsContent">
+        <!-- Projects Tab Pane -->
+        <div class="tab-pane fade show active" id="projects" role="tabpanel" aria-labelledby="projects-tab">
+            <h4>Projects</h4>
+            <!-- Add project listing here -->
+            <div id="project-list" class="row">
+                <!-- Project cards will be loaded here by JavaScript -->
+            </div>
+            <a href="{% url 'project_create' organization.id %}" class="btn btn-success mt-3">Create New Project</a>
+        </div>
+
+        <!-- Members Tab Pane -->
+        <div class="tab-pane fade" id="members" role="tabpanel" aria-labelledby="members-tab">
+            <h4>Members</h4>
+            <!-- Add member listing and management here -->
+            <ul id="member-list" class="list-group">
+                <!-- Member items will be loaded here by JavaScript -->
+            </ul>
+            <button class="btn btn-info mt-3" data-bs-toggle="modal" data-bs-target="#inviteMemberModal">Invite Member</button>
+        </div>
+
+        <!-- Settings Tab Pane -->
+        <div class="tab-pane fade" id="settings" role="tabpanel" aria-labelledby="settings-tab">
+            <h4>Settings</h4>
+            <p>Organization settings will go here. (e.g., visibility, default roles)</p>
+            <!-- Add settings form or details here -->
+        </div>
+    </div>
+</div>
+
+<!-- Delete Organization Modal -->
+<div class="modal fade" id="deleteOrgModal" tabindex="-1" aria-labelledby="deleteOrgModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteOrgModalLabel">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete the organization "{{ organization.name }}"? This action cannot be undone.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="deleteOrgForm" method="post" action="{% url 'organization_delete' organization.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Invite Member Modal -->
+<div class="modal fade" id="inviteMemberModal" tabindex="-1" aria-labelledby="inviteMemberModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="inviteMemberModalLabel">Invite Member to {{ organization.name }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="inviteMemberForm">
+                    <div class="mb-3">
+                        <label for="inviteEmail" class="form-label">Email address</label>
+                        <input type="email" class="form-control" id="inviteEmail" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="inviteRole" class="form-label">Role</label>
+                        <select class="form-select" id="inviteRole">
+                            <option value="member">Member</option>
+                            <option value="admin">Admin</option> 
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Send Invitation</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const organizationId = "{{ organization.id }}";
+        const inviteMemberForm = document.getElementById('inviteMemberForm');
+        const inviteEmailInput = document.getElementById('inviteEmail');
+        const inviteRoleInput = document.getElementById('inviteRole');
+        const projectList = document.getElementById('project-list');
+        const memberList = document.getElementById('member-list');
+
+        // Fetch and display projects
+        async function fetchProjects() {
+            try {
+                const response = await fetch(`/api/v1/organizations/${organizationId}/projects/`);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const projects = await response.json();
+                projectList.innerHTML = ''; // Clear existing projects
+                if (projects.length === 0) {
+                    projectList.innerHTML = '<p>No projects found in this organization.</p>';
+                    return;
+                }
+                projects.forEach(project => {
+                    const projectCard = `
+                        <div class="col-md-4 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title"><a href="/projects/${project.id}/">${project.name}</a></h5>
+                                    <p class="card-text">${project.description ? project.description.substring(0, 100) + '...' : 'No description'}</p>
+                                    <a href="/projects/${project.id}/" class="btn btn-sm btn-outline-primary">View Project</a>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    projectList.insertAdjacentHTML('beforeend', projectCard);
+                });
+            } catch (error) {
+                console.error('Error fetching projects:', error);
+                projectList.innerHTML = '<p class="text-danger">Could not load projects.</p>';
+            }
+        }
+
+        // Fetch and display members
+        async function fetchMembers() {
+            try {
+                const response = await fetch(`/api/v1/organizations/${organizationId}/members/`);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const members = await response.json();
+                memberList.innerHTML = ''; // Clear existing members
+                if (members.length === 0) {
+                    memberList.innerHTML = '<li class="list-group-item">No members found in this organization.</li>';
+                    return;
+                }
+                members.forEach(membership => {
+                    const memberItem = `
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            ${membership.user.username} (${membership.user.email}) - ${membership.role}
+                            {% if request.user.is_staff or request.user == organization.owner %}
+                            <div>
+                                <button class="btn btn-sm btn-warning me-2" onclick="changeMemberRole('${membership.id}', '${membership.role === 'admin' ? 'member' : 'admin'}')">Change to ${membership.role === 'admin' ? 'Member' : 'Admin'}</button>
+                                <button class="btn btn-sm btn-danger" onclick="removeMember('${membership.id}')">Remove</button>
+                            </div>
+                            {% endif %}
+                        </li>
+                    `;
+                    memberList.insertAdjacentHTML('beforeend', memberItem);
+                });
+            } catch (error) {
+                console.error('Error fetching members:', error);
+                memberList.innerHTML = '<li class="list-group-item text-danger">Could not load members.</li>';
+            }
+        }
+
+        // Handle invite member form submission
+        if(inviteMemberForm) {
+            inviteMemberForm.addEventListener('submit', async function(event) {
+                event.preventDefault();
+                const email = inviteEmailInput.value;
+                const role = inviteRoleInput.value;
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+                try {
+                    const response = await fetch(`/api/v1/organizations/${organizationId}/invitations/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken
+                        },
+                        body: JSON.stringify({ email: email, role: role })
+                    });
+                    if (response.ok) {
+                        alert('Invitation sent successfully!');
+                        inviteEmailInput.value = '';
+                        var inviteModal = bootstrap.Modal.getInstance(document.getElementById('inviteMemberModal'));
+                        inviteModal.hide();
+                        fetchMembers(); // Refresh member list if needed (or display pending invitations)
+                    } else {
+                        const errorData = await response.json();
+                        alert('Error sending invitation: ' + (errorData.detail || JSON.stringify(errorData)));
+                    }
+                } catch (error) {
+                    console.error('Error sending invitation:', error);
+                    alert('An unexpected error occurred. Please try again.');
+                }
+            });
+        }
+        
+        // Function to change member role
+        window.changeMemberRole = async function(membershipId, newRole) {
+            if (!confirm(`Are you sure you want to change this member's role to ${newRole}?`)) return;
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            try {
+                const response = await fetch(`/api/v1/organization-memberships/${membershipId}/`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({ role: newRole })
+                });
+                if (response.ok) {
+                    alert('Member role updated successfully.');
+                    fetchMembers(); // Refresh member list
+                } else {
+                    const errorData = await response.json();
+                    alert('Error updating role: ' + (errorData.detail || JSON.stringify(errorData)));
+                }
+            } catch (error) {
+                console.error('Error updating member role:', error);
+                alert('An unexpected error occurred while updating role.');
+            }
+        }
+
+        // Function to remove a member
+        window.removeMember = async function(membershipId) {
+            if (!confirm('Are you sure you want to remove this member from the organization?')) return;
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            try {
+                const response = await fetch(`/api/v1/organization-memberships/${membershipId}/`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    }
+                });
+                if (response.ok) {
+                    alert('Member removed successfully.');
+                    fetchMembers(); // Refresh member list
+                } else {
+                    const errorData = await response.json();
+                    alert('Error removing member: ' + (errorData.detail || JSON.stringify(errorData)));
+                }
+            } catch (error) {
+                console.error('Error removing member:', error);
+                alert('An unexpected error occurred while removing member.');
+            }
+        }
+
+        // Initial data fetch
+        fetchProjects();
+        fetchMembers();
+    });
+</script>
+{% endblock %}

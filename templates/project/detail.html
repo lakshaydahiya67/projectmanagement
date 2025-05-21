@@ -1,0 +1,436 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}{{ project.name }} - Project Details{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Project Header -->
+    <div class="row mb-3">
+        <div class="col-md-8">
+            <h2>{{ project.name }}</h2>
+            <p class="text-muted">{{ project.description }}</p>
+            <p>
+                <span class="badge bg-secondary">Organization: <a href="{% url 'organization_detail' project.organization.id %}" class="text-white text-decoration-none">{{ project.organization.name }}</a></span>
+                <span class="badge bg-info text-dark">Start Date: {{ project.start_date|date:"Y-m-d" }}</span>
+                <span class="badge bg-warning text-dark">End Date: {{ project.end_date|date:"Y-m-d" }}</span>
+            </p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="#" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editProjectModal">Edit Project</a>
+            {% if request.user == project.owner or request.user.is_staff %}
+            <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteProjectModal">Delete Project</button>
+            {% endif %}
+            {% if default_board %}
+            <a href="{% url 'board_detail' project.id default_board.id %}" class="btn btn-success btn-sm">View Board</a>
+            {% else %}
+            <button class="btn btn-success btn-sm" disabled>No Boards Available</button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tabs for Project Details -->
+    <ul class="nav nav-tabs mb-3" id="projectDetailTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab" aria-controls="overview" aria-selected="true">Overview</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tasks-tab" data-bs-toggle="tab" data-bs-target="#tasks" type="button" role="tab" aria-controls="tasks" aria-selected="false">Tasks</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="members-tab" data-bs-toggle="tab" data-bs-target="#project-members" type="button" role="tab" aria-controls="project-members" aria-selected="false">Members</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="activity-tab" data-bs-toggle="tab" data-bs-target="#project-activity" type="button" role="tab" aria-controls="project-activity" aria-selected="false">Activity</button>
+        </li>
+         <li class="nav-item" role="presentation">
+            <button class="nav-link" id="settings-tab" data-bs-toggle="tab" data-bs-target="#project-settings" type="button" role="tab" aria-controls="project-settings" aria-selected="false">Settings</button>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="projectDetailTabsContent">
+        <!-- Overview Tab -->
+        <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview-tab">
+            <h4>Project Overview</h4>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Progress</h5>
+                            <div class="progress mb-2">
+                                <div class="progress-bar" role="progressbar" style="width: {{ project.progress|default:0 }}%;" aria-valuenow="{{ project.progress|default:0 }}" aria-valuemin="0" aria-valuemax="100">{{ project.progress|default:0 }}%</div>
+                            </div>
+                            <p>Status: <span class="badge bg-primary">{{ project.status }}</span></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Key Metrics</h5>
+                            <p>Total Tasks: <span id="total-tasks-count">-</span></p>
+                            <p>Completed Tasks: <span id="completed-tasks-count">-</span></p>
+                            <p>Due Tasks: <span id="due-tasks-count">-</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-3">
+                <h5>Recent Updates</h5>
+                <ul class="list-group" id="project-recent-activity-overview">
+                    <!-- Activity items will be loaded here -->
+                     <li class="list-group-item">No recent activity.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Tasks Tab -->
+        <div class="tab-pane fade" id="tasks" role="tabpanel" aria-labelledby="tasks-tab">
+            <h4>Tasks List</h4>
+            <div class="d-flex justify-content-end mb-2">
+                 <a href="{% url 'task_create' project.id %}" class="btn btn-success btn-sm">Create New Task</a>
+            </div>
+            <ul class="list-group" id="project-task-list">
+                <!-- Tasks will be loaded here by JavaScript -->
+                <li class="list-group-item">Loading tasks...</li>
+            </ul>
+        </div>
+
+        <!-- Members Tab -->
+        <div class="tab-pane fade" id="project-members" role="tabpanel" aria-labelledby="members-tab">
+            <h4>Project Members</h4>
+            <ul class="list-group" id="project-member-list">
+                <!-- Members will be loaded here by JavaScript -->
+                <li class="list-group-item">Loading members...</li>
+            </ul>
+             <button class="btn btn-info mt-3 btn-sm" data-bs-toggle="modal" data-bs-target="#addProjectMemberModal">Add Member</button>
+        </div>
+
+        <!-- Activity Tab -->
+        <div class="tab-pane fade" id="project-activity" role="tabpanel" aria-labelledby="activity-tab">
+            <h4>Project Activity Log</h4>
+            <ul class="list-group" id="project-activity-log-full">
+                <!-- Full activity log will be loaded here by JavaScript -->
+                <li class="list-group-item">Loading activity...</li>
+            </ul>
+        </div>
+        
+        <!-- Settings Tab -->
+        <div class="tab-pane fade" id="project-settings" role="tabpanel" aria-labelledby="settings-tab">
+            <h4>Project Settings</h4>
+            <p>Details related to project settings (e.g., visibility, notifications, integrations).</p>
+            <!-- Add project settings form or details here -->
+        </div>
+    </div>
+</div>
+
+<!-- Edit Project Modal -->
+<div class="modal fade" id="editProjectModal" tabindex="-1" aria-labelledby="editProjectModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editProjectModalLabel">Edit Project: {{ project.name }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editProjectForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="project_id" value="{{ project.id }}">
+                    <div class="mb-3">
+                        <label for="editProjectName" class="form-label">Project Name</label>
+                        <input type="text" class="form-control" id="editProjectName" name="name" value="{{ project.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editProjectDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="editProjectDescription" name="description" rows="3">{{ project.description }}</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editProjectStartDate" class="form-label">Start Date</label>
+                        <input type="date" class="form-control" id="editProjectStartDate" name="start_date" value="{{ project.start_date|date:'Y-m-d' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editProjectEndDate" class="form-label">End Date</label>
+                        <input type="date" class="form-control" id="editProjectEndDate" name="end_date" value="{{ project.end_date|date:'Y-m-d' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editProjectStatus" class="form-label">Status</label>
+                        <select class="form-select" id="editProjectStatus" name="status">
+                            <option value="Planning" {% if project.status == 'Planning' %}selected{% endif %}>Planning</option>
+                            <option value="In Progress" {% if project.status == 'In Progress' %}selected{% endif %}>In Progress</option>
+                            <option value="Completed" {% if project.status == 'Completed' %}selected{% endif %}>Completed</option>
+                            <option value="On Hold" {% if project.status == 'On Hold' %}selected{% endif %}>On Hold</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Project Modal -->
+<div class="modal fade" id="deleteProjectModal" tabindex="-1" aria-labelledby="deleteProjectModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteProjectModalLabel">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete the project "{{ project.name }}"? This action cannot be undone and will delete all associated tasks.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="deleteProjectForm" method="post" action="{% url 'project_delete' project.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Delete Project</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Project Member Modal -->
+<div class="modal fade" id="addProjectMemberModal" tabindex="-1" aria-labelledby="addProjectMemberModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addProjectMemberModalLabel">Add Member to {{ project.name }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addProjectMemberForm">
+                    <div class="mb-3">
+                        <label for="memberEmail" class="form-label">User's Email or Username</label>
+                        <input type="text" class="form-control" id="memberEmail" placeholder="Enter email or username" required>
+                         <small>Only users already in the organization can be added to projects.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="memberRoleProject" class="form-label">Role in Project</label>
+                        <select class="form-select" id="memberRoleProject">
+                            <option value="member">Member</option>
+                            <option value="viewer">Viewer</option> 
+                            <option value="editor">Editor</option> 
+                            <!-- Add more roles as needed -->
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Member</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const projectId = "{{ project.id }}";
+    const csrfToken = "{{ csrf_token }}";
+    const taskListUl = document.getElementById('project-task-list');
+    const memberListUl = document.getElementById('project-member-list');
+    const activityLogUl = document.getElementById('project-activity-log-full');
+    const recentActivityOverviewUl = document.getElementById('project-recent-activity-overview');
+
+    const totalTasksSpan = document.getElementById('total-tasks-count');
+    const completedTasksSpan = document.getElementById('completed-tasks-count');
+    const dueTasksSpan = document.getElementById('due-tasks-count');
+
+    // Fetch and display tasks
+    async function fetchTasks() {
+        try {
+            const response = await fetch(`/api/v1/projects/${projectId}/tasks/`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const tasks = await response.json();
+            taskListUl.innerHTML = '';
+            let completedCount = 0;
+            let dueCount = 0;
+            const today = new Date().toISOString().split('T')[0];
+
+            if (tasks.length === 0) {
+                taskListUl.innerHTML = '<li class="list-group-item">No tasks found for this project.</li>';
+            } else {
+                tasks.forEach(task => {
+                    const taskItem = `
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <a href="{% url 'project_task_detail' project_id=project.id task_id='00000000-0000-0000-0000-000000000000' %}".replace('00000000-0000-0000-0000-000000000000', task.id) >${task.title}</a>
+                                <small class="d-block text-muted">Status: ${task.status} | Priority: ${task.priority} | Due: ${task.due_date || 'N/A'}</small>
+                            </div>
+                            <div>
+                                <a href="{% url 'project_task_update' project_id=project.id task_id='00000000-0000-0000-0000-000000000000' %}".replace('00000000-0000-0000-0000-000000000000', task.id) class="btn btn-sm btn-outline-info me-2">Edit</a>
+                            </div>
+                        </li>
+                    `;
+                    taskListUl.insertAdjacentHTML('beforeend', taskItem);
+                    if (task.status === 'Completed') completedCount++;
+                    if (task.due_date && task.due_date <= today && task.status !== 'Completed') dueCount++;
+                });
+            }
+            if(totalTasksSpan) totalTasksSpan.textContent = tasks.length;
+            if(completedTasksSpan) completedTasksSpan.textContent = completedCount;
+            if(dueTasksSpan) dueTasksSpan.textContent = dueCount;
+
+        } catch (error) {
+            console.error('Error fetching tasks:', error);
+            taskListUl.innerHTML = '<li class="list-group-item text-danger">Could not load tasks.</li>';
+        }
+    }
+
+    // Fetch and display project members
+    async function fetchProjectMembers() {
+        try {
+            const response = await fetch(`/api/v1/projects/${projectId}/members/`);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const members = await response.json();
+            memberListUl.innerHTML = '';
+            if (members.length === 0) {
+                memberListUl.innerHTML = '<li class="list-group-item">No members assigned to this project.</li>';
+            } else {
+                members.forEach(member => {
+                    const memberItem = `
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            ${member.user.username} (${member.user.email}) - Role: ${member.role}
+                            {% if request.user == project.owner or request.user.is_staff %}
+                            <button class="btn btn-sm btn-danger" onclick="removeProjectMember('${member.id}')">Remove</button>
+                            {% endif %}
+                        </li>
+                    `;
+                    memberListUl.insertAdjacentHTML('beforeend', memberItem);
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching project members:', error);
+            memberListUl.innerHTML = '<li class="list-group-item text-danger">Could not load members.</li>';
+        }
+    }
+
+    // Fetch and display project activity log
+    async function fetchProjectActivity(limit = 0, targetUl = activityLogUl) {
+        try {
+            let url = `/api/v1/projects/${projectId}/activity_logs/`;
+            if (limit > 0) {
+                url += `?limit=${limit}`;
+            }
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const activities = await response.json();
+            targetUl.innerHTML = '';
+            if (activities.length === 0) {
+                targetUl.innerHTML = '<li class="list-group-item">No activity recorded for this project.</li>';
+            } else {
+                activities.forEach(activity => {
+                    const activityItem = `
+                        <li class="list-group-item">
+                            <small class="text-muted">${new Date(activity.timestamp).toLocaleString()} by ${activity.user_username || 'System'}</small><br>
+                            ${activity.description}
+                        </li>
+                    `;
+                    targetUl.insertAdjacentHTML('beforeend', activityItem);
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching project activity:', error);
+            targetUl.innerHTML = '<li class="list-group-item text-danger">Could not load activity.</li>';
+        }
+    }
+    
+    // Edit Project Form Submission
+    const editProjectForm = document.getElementById('editProjectForm');
+    if (editProjectForm) {
+        editProjectForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(editProjectForm);
+            const data = Object.fromEntries(formData.entries());
+            delete data.project_id; // Not needed in payload for PATCH
+
+            try {
+                const response = await fetch(`/api/v1/projects/${projectId}/`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify(data)
+                });
+                if (response.ok) {
+                    alert('Project updated successfully!');
+                    window.location.reload(); // Reload to see changes
+                } else {
+                    const errorData = await response.json();
+                    alert('Error updating project: ' + (errorData.detail || JSON.stringify(errorData)));
+                }
+            } catch (error) {
+                console.error('Error updating project:', error);
+                alert('An unexpected error occurred.');
+            }
+        });
+    }
+
+    // Add Project Member Form Submission
+    const addProjectMemberForm = document.getElementById('addProjectMemberForm');
+    if (addProjectMemberForm) {
+        addProjectMemberForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const userIdentifier = document.getElementById('memberEmail').value;
+            const role = document.getElementById('memberRoleProject').value;
+
+            try {
+                const response = await fetch(`/api/v1/projects/${projectId}/members/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({ user_identifier: userIdentifier, role: role })
+                });
+                if (response.ok) {
+                    alert('Member added to project successfully!');
+                    fetchProjectMembers(); // Refresh member list
+                    var modal = bootstrap.Modal.getInstance(document.getElementById('addProjectMemberModal'));
+                    modal.hide();
+                    addProjectMemberForm.reset();
+                } else {
+                    const errorData = await response.json();
+                    alert('Error adding member: ' + (errorData.detail || JSON.stringify(errorData)));
+                }
+            } catch (error) {
+                console.error('Error adding member to project:', error);
+                alert('An unexpected error occurred.');
+            }
+        });
+    }
+
+    // Function to remove a project member
+    window.removeProjectMember = async function(membershipId) {
+        if (!confirm('Are you sure you want to remove this member from the project?')) return;
+        try {
+            const response = await fetch(`/api/v1/project-memberships/${membershipId}/`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRFToken': csrfToken
+                }
+            });
+            if (response.ok) {
+                alert('Member removed from project successfully.');
+                fetchProjectMembers(); // Refresh member list
+            } else {
+                const errorData = await response.json();
+                alert('Error removing member: ' + (errorData.detail || JSON.stringify(errorData)));
+            }
+        } catch (error) {
+            console.error('Error removing project member:', error);
+            alert('An unexpected error occurred.');
+        }
+    }
+
+    // Initial data fetch
+    fetchTasks();
+    fetchProjectMembers();
+    fetchProjectActivity(5, recentActivityOverviewUl); // For overview tab
+    fetchProjectActivity(0, activityLogUl); // For full activity tab
+});
+</script>
+{% endblock %}

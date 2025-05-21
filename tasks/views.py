@@ -2,7 +2,7 @@ from rest_framework import viewsets, generics, permissions, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle, ScopedRateThrottle
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.db.models import Q, F
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -956,8 +956,130 @@ class IsAttachmentUploaderOrProjectAdmin(permissions.BasePermission):
             return True
         
         # Check if user is a project admin
-        project = obj.task.column.board.project
-        return project.members.filter(
-            user=request.user, 
+        task = obj.task
+        project = task.column.board.project
+        return ProjectMember.objects.filter(
+            project=project,
+            user=request.user,
             role__in=[ProjectMember.ADMIN, ProjectMember.OWNER]
         ).exists()
+
+
+# View for rendering the task detail HTML page
+def task_detail_view(request, task_id, project_id=None):
+    """
+    View function for rendering the task detail page with task object in context
+    Can be accessed with or without project_id in the URL
+    """
+    task = get_object_or_404(Task, id=task_id)
+    project = task.column.board.project
+    
+    # Verify project_id if provided
+    if project_id and str(project.id) != str(project_id):
+        return render(request, 'base/error.html', {
+            'message': 'Task does not belong to the specified project.'
+        }, status=400)
+    
+    # Permission check: user must be a member of the project or the project must be public
+    is_member = ProjectMember.objects.filter(project=project, user=request.user).exists()
+    
+    if not (is_member or request.user.is_staff):
+        return render(request, 'base/error.html', {
+            'message': 'You do not have permission to view this task.'
+        }, status=403)
+    
+    # Add task and related objects to context
+    context = {
+        'task': task,
+        'project': project,
+        'column': task.column,
+        'board': task.column.board
+    }
+    
+    return render(request, 'task/task_detail.html', context)
+
+
+# View for rendering the task creation HTML page
+def task_create_view(request, project_id):
+    """
+    View function for rendering the task creation page
+    """
+    project = get_object_or_404(Project, id=project_id)
+    
+    # Permission check: user must be a member of the project
+    is_member = ProjectMember.objects.filter(project=project, user=request.user).exists()
+    
+    if not (is_member or request.user.is_staff):
+        return render(request, 'base/error.html', {
+            'message': 'You do not have permission to create tasks in this project.'
+        }, status=403)
+    
+    # Get the boards for this project
+    boards = project.boards.all()
+    
+    # Get all columns from all boards
+    columns = Column.objects.filter(board__in=boards)
+    
+    # Get project members for assignee selection
+    project_members = ProjectMember.objects.filter(project=project)
+    
+    # Get labels for this project
+    labels = Label.objects.filter(project=project)
+    
+    context = {
+        'project': project,
+        'boards': boards,
+        'columns': columns,
+        'project_members': project_members,
+        'labels': labels
+    }
+    
+    return render(request, 'task/task_create.html', context)
+
+
+# View for rendering the task update HTML page
+def task_update_view(request, task_id, project_id=None):
+    """
+    View function for rendering the task update page
+    Can be accessed with or without project_id in the URL
+    """
+    task = get_object_or_404(Task, id=task_id)
+    project = task.column.board.project
+    
+    # Verify project_id if provided
+    if project_id and str(project.id) != str(project_id):
+        return render(request, 'base/error.html', {
+            'message': 'Task does not belong to the specified project.'
+        }, status=400)
+    
+    # Permission check: user must be a member of the project
+    is_member = ProjectMember.objects.filter(project=project, user=request.user).exists()
+    
+    if not (is_member or request.user.is_staff):
+        return render(request, 'base/error.html', {
+            'message': 'You do not have permission to update this task.'
+        }, status=403)
+    
+    # Get the boards for this project
+    boards = project.boards.all()
+    
+    # Get all columns from all boards
+    columns = Column.objects.filter(board__in=boards)
+    
+    # Get project members for assignee selection
+    project_members = ProjectMember.objects.filter(project=project)
+    
+    # Get labels for this project
+    labels = Label.objects.filter(project=project)
+    
+    context = {
+        'task': task,
+        'project': project,
+        'boards': boards,
+        'columns': columns,
+        'project_members': project_members,
+        'labels': labels,
+        'board': task.column.board
+    }
+    
+    return render(request, 'task/task_update.html', context)

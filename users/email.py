@@ -133,6 +133,12 @@ class ActivationEmail(email.ActivationEmail):
         # Make sure we're using the correct domain with port for local development
         domain = context['domain']
         
+        # Fix: Handle comma-separated domain list by taking only the first domain
+        if ',' in domain:
+            # Split by comma and take the first domain
+            domain = domain.split(',')[0].strip()
+            logger.info(f"Multiple domains detected, using first domain: {domain}")
+        
         # If we're running locally on port 8000, ensure the port is included
         if domain == 'localhost' and os.environ.get('PORT', '8000') != '80':
             domain = f"localhost:{os.environ.get('PORT', '8000')}"

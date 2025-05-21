@@ -119,6 +119,59 @@ class IsProjectAdmin(permissions.BasePermission):
         
         return membership.is_admin
 
+class IsProjectManager(permissions.BasePermission):
+    """
+    Permission to only allow managers, admins, or owners of a project to perform certain actions
+    """
+    def has_permission(self, request, view):
+        # Try to get project ID from various possible routes
+        project_id = view.kwargs.get('project_pk') or view.kwargs.get('pk')
+        
+        # Handle nested routes through columns
+        if not project_id:
+            column_id = view.kwargs.get('column_pk')
+            if column_id:
+                from projects.models import Column
+                try:
+                    column = Column.objects.get(id=column_id)
+                    project_id = column.board.project_id
+                except Column.DoesNotExist:
+                    return False
+            else:
+                return False
+        
+        membership = ProjectMember.objects.filter(
+            project_id=project_id,
+            user=request.user
+        ).first()
+        
+        if not membership:
+            return False
+        
+        return membership.is_manager
+    
+    def has_object_permission(self, request, view, obj):
+        # Check if project field exists on the object
+        if hasattr(obj, 'project'):
+            project = obj.project
+        elif isinstance(obj, Project):
+            project = obj
+        elif hasattr(obj, 'column') and hasattr(obj.column, 'board'):
+            # Support for Task objects that have column->board->project path
+            project = obj.column.board.project
+        else:
+            return False
+        
+        membership = ProjectMember.objects.filter(
+            project=project,
+            user=request.user
+        ).first()
+        
+        if not membership:
+            return False
+        
+        return membership.is_manager
+
 class IsProjectAdminOrReadOnly(permissions.BasePermission):
     """
     Permission to only allow admins to make write actions

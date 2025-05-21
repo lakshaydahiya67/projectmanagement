@@ -1,0 +1,725 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Task Details - Project Management{% endblock %}
+
+{% block extra_css %}
+<style>
+    .comment-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+    }
+    .comment-container {
+        border-left: 3px solid #e9ecef;
+        padding-left: 15px;
+        margin-bottom: 20px;
+    }
+    .task-label {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        margin-right: 5px;
+        margin-bottom: 5px;
+        font-size: 0.75rem;
+    }
+    .priority-high {
+        border-left: 4px solid var(--danger-color);
+    }
+    .priority-medium {
+        border-left: 4px solid var(--warning-color);
+    }
+    .priority-low {
+        border-left: 4px solid var(--info-color);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/dashboard/">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="#" id="project-link">Project</a></li>
+            <li class="breadcrumb-item"><a href="#" id="board-link">Board</a></li>
+            <li class="breadcrumb-item active" id="task-title-breadcrumb">Task Details</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <!-- Task Details -->
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h4 id="task-title">Loading task...</h4>
+                        <div id="task-labels"></div>
+                    </div>
+                    <div>
+                        <button class="btn btn-outline-primary btn-sm me-2" id="edit-task-btn">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <div class="dropdown d-inline-block">
+                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" id="taskActionsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                Actions
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="taskActionsDropdown">
+                                <li><a class="dropdown-item" href="#" id="move-task-btn"><i class="fas fa-arrows-alt"></i> Move Task</a></li>
+                                <li><a class="dropdown-item" href="#" id="duplicate-task-btn"><i class="fas fa-copy"></i> Duplicate</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger" href="#" id="delete-task-btn"><i class="fas fa-trash"></i> Delete</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="task-details">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <h5>Status</h5>
+                                <select class="form-select" id="task-status">
+                                    <option value="">Loading statuses...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Priority</h5>
+                                <select class="form-select" id="task-priority">
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <h5>Assignee</h5>
+                                <select class="form-select" id="task-assignee">
+                                    <option value="">Loading users...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Due Date</h5>
+                                <input type="date" class="form-control" id="task-due-date">
+                            </div>
+                        </div>
+                        
+                        <h5>Description</h5>
+                        <div id="task-description" class="border rounded p-3 mb-3 bg-light">
+                            Loading description...
+                        </div>
+                        
+                        <h5>Attachments</h5>
+                        <div id="task-attachments" class="mb-3">
+                            <div class="border rounded p-3 bg-light">
+                                <p class="text-muted mb-0">No attachments</p>
+                            </div>
+                            <div class="mt-2">
+                                <button class="btn btn-outline-primary btn-sm" id="add-attachment-btn">
+                                    <i class="fas fa-paperclip"></i> Add Attachment
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Comments Section -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Comments</h5>
+                </div>
+                <div class="card-body">
+                    <div id="comments-container">
+                        <p class="text-center py-3">Loading comments...</p>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <form id="comment-form">
+                            <div class="mb-3">
+                                <label for="comment-text" class="form-label">Add a comment</label>
+                                <textarea class="form-control" id="comment-text" rows="3" required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-paper-plane"></i> Submit
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Task Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Task Info</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Created by:</strong>
+                        <div id="created-by">Loading...</div>
+                    </div>
+                    <div class="mb-3">
+                        <strong>Created at:</strong>
+                        <div id="created-at">Loading...</div>
+                    </div>
+                    <div class="mb-3">
+                        <strong>Last updated:</strong>
+                        <div id="updated-at">Loading...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Activity Log -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Activity Log</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush" id="activity-log">
+                        <div class="list-group-item text-center py-3">Loading activity...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Task Modal -->
+<div class="modal fade" id="editTaskModal" tabindex="-1" aria-labelledby="editTaskModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editTaskModalLabel">Edit Task</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="edit-task-form">
+                <div class="modal-body">
+                    <div class="alert alert-danger d-none" id="edit-task-error" role="alert"></div>
+                    
+                    <div class="mb-3">
+                        <label for="edit-task-title" class="form-label">Title</label>
+                        <input type="text" class="form-control" id="edit-task-title" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-task-description" class="form-label">Description</label>
+                        <textarea class="form-control" id="edit-task-description" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="edit-task-status" class="form-label">Status</label>
+                            <select class="form-control" id="edit-task-status" name="status" required>
+                                <option value="">Loading statuses...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit-task-priority" class="form-label">Priority</label>
+                            <select class="form-control" id="edit-task-priority" name="priority" required>
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="edit-task-assignee" class="form-label">Assignee</label>
+                            <select class="form-control" id="edit-task-assignee" name="assignee">
+                                <option value="">None</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit-task-due-date" class="form-label">Due Date</label>
+                            <input type="date" class="form-control" id="edit-task-due-date" name="due_date">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-task-labels" class="form-label">Labels</label>
+                        <select class="form-control" id="edit-task-labels" name="labels" multiple>
+                            <option value="">Loading labels...</option>
+                        </select>
+                        <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple labels</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Task Confirmation Modal -->
+<div class="modal fade" id="deleteTaskModal" tabindex="-1" aria-labelledby="deleteTaskModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteTaskModalLabel">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this task? This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">Delete Task</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check authentication
+        if (!app.requireAuth()) return;
+        
+        const taskId = window.location.pathname.split('/').filter(Boolean).pop();
+        
+        // Load task data
+        loadTaskDetails(taskId);
+        
+        // Setup form submission handlers
+        setupCommentForm(taskId);
+        setupEditTaskForm(taskId);
+        
+        // Setup action button handlers
+        document.getElementById('edit-task-btn').addEventListener('click', function() {
+            // The modal will be populated with current task data
+            populateEditForm();
+            new bootstrap.Modal(document.getElementById('editTaskModal')).show();
+        });
+        
+        document.getElementById('delete-task-btn').addEventListener('click', function() {
+            new bootstrap.Modal(document.getElementById('deleteTaskModal')).show();
+        });
+        
+        document.getElementById('confirm-delete-btn').addEventListener('click', function() {
+            deleteTask(taskId);
+        });
+        
+        // Setup status and priority change handlers
+        document.getElementById('task-status').addEventListener('change', function() {
+            updateTaskField(taskId, 'status', this.value);
+        });
+        
+        document.getElementById('task-priority').addEventListener('change', function() {
+            updateTaskField(taskId, 'priority', this.value);
+        });
+        
+        document.getElementById('task-assignee').addEventListener('change', function() {
+            updateTaskField(taskId, 'assignee', this.value);
+        });
+        
+        document.getElementById('task-due-date').addEventListener('change', function() {
+            updateTaskField(taskId, 'due_date', this.value);
+        });
+    });
+    
+    // Load task details including comments and activity
+    async function loadTaskDetails(taskId) {
+        try {
+            // First load the task itself
+            const response = await app.fetchAPI(`/tasks/${taskId}/`);
+            if (!response.ok) {
+                throw new Error('Failed to load task');
+            }
+            
+            const task = await response.json();
+            
+            // Update the UI with task details
+            document.getElementById('task-title').textContent = task.title;
+            document.getElementById('task-title-breadcrumb').textContent = task.title;
+            document.getElementById('task-description').innerHTML = task.description || '<p class="text-muted">No description provided</p>';
+            
+            // Set up breadcrumb links
+            document.getElementById('project-link').textContent = task.project_name || 'Project';
+            document.getElementById('project-link').href = `/projects/${task.project}/`;
+            document.getElementById('board-link').textContent = task.board_name || 'Board';
+            document.getElementById('board-link').href = `/projects/${task.project}/boards/${task.board}/`;
+            
+            // Set task info
+            document.getElementById('created-by').textContent = task.created_by_name || 'Unknown';
+            document.getElementById('created-at').textContent = app.formatDate(task.created_at);
+            document.getElementById('updated-at').textContent = app.formatDate(task.updated_at);
+            
+            // Set form field values
+            if (document.getElementById('task-status')) {
+                loadBoardStatuses(task.board, task.status);
+            }
+            
+            if (document.getElementById('task-priority')) {
+                const prioritySelect = document.getElementById('task-priority');
+                prioritySelect.value = task.priority;
+            }
+            
+            if (document.getElementById('task-due-date')) {
+                const dueDateInput = document.getElementById('task-due-date');
+                dueDateInput.value = task.due_date || '';
+            }
+            
+            // Load users for assignee dropdown
+            loadProjectUsers(task.project, task.assignee);
+            
+            // Display labels
+            const labelsContainer = document.getElementById('task-labels');
+            labelsContainer.innerHTML = '';
+            if (task.labels && task.labels.length > 0) {
+                task.labels.forEach(label => {
+                    const labelSpan = document.createElement('span');
+                    labelSpan.className = 'task-label';
+                    labelSpan.style.backgroundColor = label.color || '#6c757d';
+                    labelSpan.textContent = label.name;
+                    labelsContainer.appendChild(labelSpan);
+                });
+            }
+            
+            // Load comments
+            loadComments(taskId);
+            
+            // Load activity log
+            loadActivityLog(taskId);
+            
+            // Store task data for edit form
+            window.currentTask = task;
+            
+        } catch (error) {
+            console.error('Error loading task details:', error);
+            app.showNotification('Failed to load task details: ' + error.message, 'danger');
+        }
+    }
+    
+    // Load board statuses to populate the status dropdown
+    async function loadBoardStatuses(boardId, currentStatus) {
+        try {
+            const response = await app.fetchAPI(`/boards/${boardId}/statuses/`);
+            if (!response.ok) {
+                throw new Error('Failed to load board statuses');
+            }
+            
+            const statuses = await response.json();
+            
+            const statusSelect = document.getElementById('task-status');
+            statusSelect.innerHTML = '';
+            
+            statuses.forEach(status => {
+                const option = document.createElement('option');
+                option.value = status.id;
+                option.textContent = status.name;
+                statusSelect.appendChild(option);
+            });
+            
+            if (currentStatus) {
+                statusSelect.value = currentStatus;
+            }
+            
+            // Also update the edit form dropdown
+            const editStatusSelect = document.getElementById('edit-task-status');
+            editStatusSelect.innerHTML = statusSelect.innerHTML;
+            if (currentStatus) {
+                editStatusSelect.value = currentStatus;
+            }
+            
+        } catch (error) {
+            console.error('Error loading board statuses:', error);
+        }
+    }
+    
+    // Load project users to populate the assignee dropdown
+    async function loadProjectUsers(projectId, currentAssignee) {
+        try {
+            const response = await app.fetchAPI(`/projects/${projectId}/members/`);
+            if (!response.ok) {
+                throw new Error('Failed to load project members');
+            }
+            
+            const members = await response.json();
+            
+            const assigneeSelect = document.getElementById('task-assignee');
+            assigneeSelect.innerHTML = '<option value="">Unassigned</option>';
+            
+            members.forEach(member => {
+                const option = document.createElement('option');
+                option.value = member.user.id;
+                option.textContent = member.user.full_name || member.user.username;
+                assigneeSelect.appendChild(option);
+            });
+            
+            if (currentAssignee) {
+                assigneeSelect.value = currentAssignee;
+            }
+            
+            // Also update the edit form dropdown
+            const editAssigneeSelect = document.getElementById('edit-task-assignee');
+            editAssigneeSelect.innerHTML = assigneeSelect.innerHTML;
+            if (currentAssignee) {
+                editAssigneeSelect.value = currentAssignee;
+            }
+            
+        } catch (error) {
+            console.error('Error loading project members:', error);
+        }
+    }
+    
+    // Load comments for the task
+    async function loadComments(taskId) {
+        try {
+            const response = await app.fetchAPI(`/tasks/${taskId}/comments/`);
+            if (!response.ok) {
+                throw new Error('Failed to load comments');
+            }
+            
+            const comments = await response.json();
+            
+            const commentsContainer = document.getElementById('comments-container');
+            
+            if (comments.length === 0) {
+                commentsContainer.innerHTML = '<p class="text-center py-3">No comments yet</p>';
+                return;
+            }
+            
+            commentsContainer.innerHTML = '';
+            
+            comments.forEach(comment => {
+                const commentElement = document.createElement('div');
+                commentElement.className = 'comment-container';
+                
+                commentElement.innerHTML = `
+                    <div class="d-flex mb-2">
+                        <div class="me-2">
+                            ${comment.user.avatar 
+                                ? `<img src="${comment.user.avatar}" alt="Avatar" class="comment-avatar">` 
+                                : `<div class="comment-avatar bg-secondary d-flex align-items-center justify-content-center text-white">
+                                    ${comment.user.username.charAt(0).toUpperCase()}
+                                </div>`}
+                        </div>
+                        <div>
+                            <div class="fw-bold">${comment.user.full_name || comment.user.username}</div>
+                            <div class="text-muted small">${app.formatDate(comment.created_at)}</div>
+                        </div>
+                    </div>
+                    <div class="comment-content">
+                        ${comment.content}
+                    </div>
+                `;
+                
+                commentsContainer.appendChild(commentElement);
+            });
+            
+        } catch (error) {
+            console.error('Error loading comments:', error);
+            document.getElementById('comments-container').innerHTML = 
+                '<p class="text-center py-3 text-danger">Failed to load comments</p>';
+        }
+    }
+    
+    // Load activity log for the task
+    async function loadActivityLog(taskId) {
+        try {
+            const response = await app.fetchAPI(`/activity-logs/task/${taskId}/`);
+            if (!response.ok) {
+                throw new Error('Failed to load activity log');
+            }
+            
+            const activities = await response.json();
+            
+            const activityLogContainer = document.getElementById('activity-log');
+            
+            if (activities.length === 0) {
+                activityLogContainer.innerHTML = '<div class="list-group-item text-center py-3">No activity recorded</div>';
+                return;
+            }
+            
+            activityLogContainer.innerHTML = '';
+            
+            activities.forEach(activity => {
+                const activityElement = document.createElement('div');
+                activityElement.className = 'list-group-item';
+                
+                activityElement.innerHTML = `
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">${activity.actor_name || 'Someone'}</h6>
+                        <small>${app.formatDate(activity.timestamp)}</small>
+                    </div>
+                    <p class="mb-1">${activity.description}</p>
+                `;
+                
+                activityLogContainer.appendChild(activityElement);
+            });
+            
+        } catch (error) {
+            console.error('Error loading activity log:', error);
+            document.getElementById('activity-log').innerHTML = 
+                '<div class="list-group-item text-center py-3 text-danger">Failed to load activity log</div>';
+        }
+    }
+    
+    // Set up comment form submission
+    function setupCommentForm(taskId) {
+        const commentForm = document.getElementById('comment-form');
+        
+        commentForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            
+            const commentText = document.getElementById('comment-text').value.trim();
+            if (!commentText) return;
+            
+            try {
+                const response = await app.fetchAPI(`/tasks/${taskId}/comments/`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        content: commentText
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to add comment');
+                }
+                
+                // Clear the form
+                document.getElementById('comment-text').value = '';
+                
+                // Reload comments
+                loadComments(taskId);
+                
+                app.showNotification('Comment added successfully');
+                
+            } catch (error) {
+                console.error('Error adding comment:', error);
+                app.showNotification('Failed to add comment: ' + error.message, 'danger');
+            }
+        });
+    }
+    
+    // Populate the edit form with current task data
+    function populateEditForm() {
+        if (!window.currentTask) return;
+        
+        const task = window.currentTask;
+        
+        document.getElementById('edit-task-title').value = task.title || '';
+        document.getElementById('edit-task-description').value = task.description || '';
+        document.getElementById('edit-task-due-date').value = task.due_date || '';
+        
+        if (document.getElementById('edit-task-priority')) {
+            document.getElementById('edit-task-priority').value = task.priority || 'medium';
+        }
+        
+        // Status and assignee should already be populated by their respective load functions
+    }
+    
+    // Set up edit task form submission
+    function setupEditTaskForm(taskId) {
+        const editForm = document.getElementById('edit-task-form');
+        
+        editForm.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            
+            const formData = {
+                title: document.getElementById('edit-task-title').value,
+                description: document.getElementById('edit-task-description').value,
+                status: document.getElementById('edit-task-status').value,
+                priority: document.getElementById('edit-task-priority').value,
+                due_date: document.getElementById('edit-task-due-date').value || null
+            };
+            
+            const assigneeValue = document.getElementById('edit-task-assignee').value;
+            if (assigneeValue) {
+                formData.assignee = assigneeValue;
+            } else {
+                formData.assignee = null;
+            }
+            
+            try {
+                const response = await app.fetchAPI(`/tasks/${taskId}/`, {
+                    method: 'PATCH',
+                    body: JSON.stringify(formData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to update task');
+                }
+                
+                // Hide the modal
+                bootstrap.Modal.getInstance(document.getElementById('editTaskModal')).hide();
+                
+                // Reload task details
+                loadTaskDetails(taskId);
+                
+                app.showNotification('Task updated successfully');
+                
+            } catch (error) {
+                console.error('Error updating task:', error);
+                const errorElement = document.getElementById('edit-task-error');
+                errorElement.textContent = 'Failed to update task: ' + error.message;
+                errorElement.classList.remove('d-none');
+            }
+        });
+    }
+    
+    // Update a single task field
+    async function updateTaskField(taskId, field, value) {
+        try {
+            const data = {};
+            data[field] = value;
+            
+            const response = await app.fetchAPI(`/tasks/${taskId}/`, {
+                method: 'PATCH',
+                body: JSON.stringify(data)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to update ${field}`);
+            }
+            
+            // No need to reload the entire task, just update the UI if needed
+            if (field === 'assignee' || field === 'due_date') {
+                // These fields don't need any special UI updates
+            } else if (field === 'status') {
+                // Maybe update status indicators
+            } else if (field === 'priority') {
+                // Maybe update priority indicators
+            }
+            
+        } catch (error) {
+            console.error(`Error updating ${field}:`, error);
+            app.showNotification(`Failed to update ${field}: ${error.message}`, 'danger');
+            
+            // Reset the form element to its previous value
+            if (window.currentTask && document.getElementById(`task-${field}`)) {
+                document.getElementById(`task-${field}`).value = window.currentTask[field] || '';
+            }
+        }
+    }
+    
+    // Delete task function
+    async function deleteTask(taskId) {
+        try {
+            const response = await app.fetchAPI(`/tasks/${taskId}/`, {
+                method: 'DELETE'
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to delete task');
+            }
+            
+            // Redirect to the board or project page
+            if (window.currentTask && window.currentTask.project && window.currentTask.board) {
+                window.location.href = `/projects/${window.currentTask.project}/boards/${window.currentTask.board}/`;
+            } else {
+                window.location.href = '/dashboard/';
+            }
+            
+        } catch (error) {
+            console.error('Error deleting task:', error);
+            app.showNotification('Failed to delete task: ' + error.message, 'danger');
+            
+            // Hide the modal
+            bootstrap.Modal.getInstance(document.getElementById('deleteTaskModal')).hide();
+        }
+    }
+</script>
+{% endblock %}

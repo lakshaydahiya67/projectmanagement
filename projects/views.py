@@ -1,7 +1,7 @@
 from rest_framework import viewsets, generics, permissions, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render, redirect
 from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
 
@@ -197,3 +197,171 @@ class ColumnViewSet(viewsets.ModelViewSet):
         next_order = (latest_column.order + 1) if latest_column else 0
         
         serializer.save(board=board, order=next_order)
+
+# View for rendering the project detail HTML page
+def project_detail_view(request, project_id):
+    project = get_object_or_404(Project, id=project_id)
+    user = request.user
+
+    # Permission check: 
+    # 1. User is a member of the project OR
+    # 2. Project is public AND user is a member of the project's organization OR
+    # 3. User is staff
+    is_member = ProjectMember.objects.filter(project=project, user=user).exists()
+    is_org_member_and_public = project.is_public and OrganizationMember.objects.filter(organization=project.organization, user=user).exists()
+
+    if not (is_member or is_org_member_and_public or user.is_staff):
+        return render(request, 'base/error.html', {'message': 'You do not have permission to view this project.'}, status=403)
+
+    # Get the boards for this project
+    boards = Board.objects.filter(project=project)
+    
+    # Get the default board if it exists, otherwise use the first board
+    default_board = boards.filter(is_default=True).first() or boards.first()
+    
+    return render(request, 'project/detail.html', {
+        'project': project,
+        'boards': boards,
+        'default_board': default_board
+    })
+
+
+# View for rendering the board detail HTML page
+def board_detail_view(request, project_id, board_id):
+    """
+    View function for rendering the board page with board object in context
+    """
+    project = get_object_or_404(Project, id=project_id)
+    board = get_object_or_404(Board, id=board_id, project=project)
+    user = request.user
+    
+    # Permission check: user must be a member of the project or the project must be public
+    is_member = ProjectMember.objects.filter(project=project, user=user).exists()
+    is_org_member_and_public = project.is_public and OrganizationMember.objects.filter(organization=project.organization, user=user).exists()
+    
+    if not (is_member or is_org_member_and_public or user.is_staff):
+        return render(request, 'base/error.html', {'message': 'You do not have permission to view this board.'}, status=403)
+    
+    # Add board and related objects to context
+    context = {
+        'board': board,
+        'project': project,
+        'organization': project.organization
+    }
+    
+    return render(request, 'board/board.html', context)
+
+
+# View for handling project deletion
+def project_delete_view(request, project_id):
+    """
+    View function for handling project deletion
+    Requires POST method and checks if user has admin permissions
+    """
+    project = get_object_or_404(Project, id=project_id)
+    user = request.user
+    
+    # Only allow POST requests for deletion
+    if request.method != 'POST':
+        return render(request, 'base/error.html', {
+            'message': 'Invalid request method. Project deletion requires a POST request.'
+        }, status=405)
+    
+    # Check if user has admin permissions for this project
+    is_admin = ProjectMember.objects.filter(
+        project=project, 
+        user=user, 
+        role__in=[ProjectMember.ADMIN, ProjectMember.OWNER]
+    ).exists()
+    
+    if not (is_admin or user.is_staff):
+        return render(request, 'base/error.html', {
+            'message': 'You do not have permission to delete this project.'
+        }, status=403)
+    
+    # Store project name for success message
+    project_name = project.name
+    
+    # Delete the project
+    project.delete()
+    
+    # Redirect to dashboard with success message
+    from django.contrib import messages
+    messages.success(request, f'Project "{project_name}" has been successfully deleted.')
+    
+    return redirect('dashboard')
+
+
+# View for creating a new project
+def project_create_view(request, org_id):
+    """
+    View function for creating a new project within an organization
+    """
+    from organizations.models import Organization
+    
+    # Get the organization
+    organization = get_object_or_404(Organization, id=org_id)
+    
+    # Check if user is a member of the organization
+    is_org_member = OrganizationMember.objects.filter(
+        organization=organization,
+        user=request.user
+    ).exists() or request.user.is_staff
+    
+    if not is_org_member:
+        return render(request, 'base/error.html', {
+            'message': 'You do not have permission to create projects in this organization.'
+        }, status=403)
+    
+    if request.method == 'POST':
+        # Process form data
+        name = request.POST.get('name')
+        description = request.POST.get('description')
+        start_date = request.POST.get('start_date')
+        end_date = request.POST.get('end_date')
+        is_public = request.POST.get('is_public') == 'on'
+        
+        if name:  # Name is required
+            # Create the project
+            project = Project.objects.create(
+                name=name,
+                description=description,
+                organization=organization,
+                start_date=start_date if start_date else None,
+                end_date=end_date if end_date else None,
+                is_public=is_public
+            )
+            
+            # Add the creator as a project admin
+            ProjectMember.objects.create(
+                project=project,
+                user=request.user,
+                role='ADMIN'
+            )
+            
+            # Create a default board for the project
+            board = Board.objects.create(
+                project=project,
+                name='Default Board',
+                description='Default project board'
+            )
+            
+            # Create default columns for the board
+            columns = [
+                {'name': 'To Do', 'order': 1},
+                {'name': 'In Progress', 'order': 2},
+                {'name': 'Done', 'order': 3}
+            ]
+            
+            for column_data in columns:
+                Column.objects.create(
+                    board=board,
+                    name=column_data['name'],
+                    order=column_data['order']
+                )
+            
+            # Redirect to the project detail page
+            return redirect('project_detail', project_id=project.id)
+    
+    # Render the project creation form
+    return render(request, 'project/create.html', {'organization': organization})

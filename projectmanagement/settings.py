@@ -34,7 +34,10 @@ DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() == 'true'
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,backend').split(',')
 
 # Frontend URL for redirects and email links
-SITE_URL = os.environ.get('SITE_URL', 'http://localhost:8000')
+# Ensure we have a single valid URL for SITE_URL
+# If multiple URLs are provided in the environment, use only the first one
+raw_site_url = os.environ.get('SITE_URL', 'http://localhost:8000')
+SITE_URL = raw_site_url.split(',')[0].strip() if ',' in raw_site_url else raw_site_url
 
 
 # Application definition
@@ -63,6 +66,14 @@ try:
     import rest_framework
     INSTALLED_APPS.append('rest_framework')
     INSTALLED_APPS.append('rest_framework.authtoken')
+    
+    # Add SimpleJWT token blacklist app
+    try:
+        import rest_framework_simplejwt
+        INSTALLED_APPS.append('rest_framework_simplejwt')
+        INSTALLED_APPS.append('rest_framework_simplejwt.token_blacklist')
+    except ImportError:
+        pass
 except ImportError:
     pass
 
@@ -111,6 +122,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'users.http_middleware.JWTAuthenticationMiddleware',  # Add JWT authentication middleware
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -215,6 +227,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Custom User Model
 AUTH_USER_MODEL = 'users.User'
 
+# Authentication backends
+AUTHENTICATION_BACKENDS = [
+    'users.auth.JWTAuthenticationBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
 # REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -254,9 +272,18 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=JWT_REFRESH_TOKEN_LIFETIME_DAYS),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
     'SIGNING_KEY': os.environ.get('JWT_SIGNING_KEY', SECRET_KEY),
     'ALGORITHM': 'HS256',
     'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+    'USER_AUTHENTICATION_RULE': 'rest_framework_simplejwt.authentication.default_user_authentication_rule',
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+    'TOKEN_USER_CLASS': 'rest_framework_simplejwt.models.TokenUser',
+    'JTI_CLAIM': 'jti',
 }
 
 # Djoser settings
@@ -271,7 +298,9 @@ DJOSER = {
         'activation': 'users.email.ActivationEmail',
         'confirmation': 'users.email.ActivationEmail',
     },
-    'DOMAIN': SITE_URL.replace('http://', '').replace('https://', ''),
+    # Fix: Properly parse the SITE_URL to extract just the domain
+    # This handles cases where SITE_URL might contain multiple domains
+    'DOMAIN': SITE_URL.replace('http://', '').replace('https://', '').split(',')[0].strip(),
     'SITE_NAME': 'Project Management',
     'PASSWORD_RESET_SHOW_EMAIL_NOT_FOUND': False,
     'PASSWORD_RESET_CONFIRM_RETYPE': True,
