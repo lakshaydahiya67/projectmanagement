@@ -1,6 +1,11 @@
 from django.urls import path, include
 from rest_framework_nested import routers
+from rest_framework import routers as drf_routers
 from .views import LabelViewSet, TaskViewSet, CommentViewSet, AttachmentViewSet
+
+# Direct route for tasks
+task_direct_router = drf_routers.DefaultRouter()
+task_direct_router.register(r'tasks', TaskViewSet, basename='task')
 
 # Tasks are nested under columns
 column_router = routers.SimpleRouter()
@@ -20,6 +25,9 @@ project_router = routers.SimpleRouter()
 project_router.register(r'projects/(?P<project_pk>[^/.]+)/labels', LabelViewSet, basename='project-labels')
 
 urlpatterns = [
+    # Direct access to tasks
+    path('', include(task_direct_router.urls)),
+    # Nested routes
     path('', include(column_router.urls)),
     path('', include(tasks_router.urls)),
     path('', include(task_resources_router.urls)),

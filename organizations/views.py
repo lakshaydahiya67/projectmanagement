@@ -28,6 +28,10 @@ class OrganizationViewSet(viewsets.ModelViewSet):
     queryset = Organization.objects.all()  # Add this line to fix the router issue
     
     def get_queryset(self):
+        # Check if this is a schema generation request for Swagger
+        if getattr(self, 'swagger_fake_view', False):
+            return Organization.objects.none()
+            
         # Return organizations the user is a member of
         return Organization.objects.filter(
             members__user=self.request.user

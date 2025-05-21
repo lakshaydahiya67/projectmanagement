@@ -30,6 +30,10 @@ class ProjectViewSet(viewsets.ModelViewSet):
     ordering = ['-created_at']
     
     def get_queryset(self):
+        # Check if this is a schema generation request for Swagger
+        if getattr(self, 'swagger_fake_view', False):
+            return Project.objects.none()
+            
         # Get all projects the user has access to
         # - Projects the user is a member of
         # - Public projects in organizations the user is a member of

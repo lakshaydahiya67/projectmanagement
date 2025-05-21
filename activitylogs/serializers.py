@@ -16,6 +16,7 @@ class ActivityLogSerializer(serializers.ModelSerializer):
             'metadata', 'project_id'
         ]
         read_only_fields = fields
+        ref_name = 'ActivityLogAudit'  # Unique reference name for Swagger
     
     def get_content_type_display(self, obj):
         """Get the display name for the content type"""

@@ -38,6 +38,11 @@ class UserViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Admin can see all users, regular users only see themselves and users from their organizations
         user = self.request.user
+        
+        # Check if this is a schema generation request for Swagger
+        if getattr(self, 'swagger_fake_view', False):
+            return User.objects.none()
+            
         if user.is_staff or user.is_superuser:
             return User.objects.all()
             

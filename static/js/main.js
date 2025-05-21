@@ -49,10 +49,60 @@ function getCsrfToken() {
 
 // Check if user is authenticated
 function isAuthenticated() {
-    // Check multiple sources for the token
-    return localStorage.getItem('access_token') !== null || 
-           document.cookie.includes('access_token=') || 
-           (window.sessionStorage && sessionStorage.getItem('access_token') !== null);
+    // Get the current timestamp
+    const now = Math.floor(Date.now() / 1000);
+    
+    // Check if there's a recent logout
+    const logoutTimestamp = getCookie('logout_timestamp');
+    if (logoutTimestamp && (now - parseInt(logoutTimestamp)) < 300) { // 5 minutes
+        console.log('Recent logout detected, considering as not authenticated');
+        return false;
+    }
+    
+    // Get token from localStorage
+    const localToken = localStorage.getItem('access_token');
+    if (localToken) {
+        try {
+            // Try to parse the JWT to check if it's expired
+            const payload = JSON.parse(atob(localToken.split('.')[1]));
+            if (payload.exp && payload.exp > now) {
+                return true;
+            }
+        } catch (e) {
+            console.warn('Error parsing token:', e);
+        }
+    }
+    
+    // Check cookie for token
+    const cookieToken = getCookie('access_token');
+    if (cookieToken) {
+        try {
+            const payload = JSON.parse(atob(cookieToken.split('.')[1]));
+            if (payload.exp && payload.exp > now) {
+                return true;
+            }
+        } catch (e) {
+            console.warn('Error parsing cookie token:', e);
+        }
+    }
+    
+    // Check sessionStorage
+    if (window.sessionStorage) {
+        const sessionToken = sessionStorage.getItem('access_token');
+        if (sessionToken) {
+            try {
+                const payload = JSON.parse(atob(sessionToken.split('.')[1]));
+                if (payload.exp && payload.exp > now) {
+                    return true;
+                }
+            } catch (e) {
+                console.warn('Error parsing session token:', e);
+            }
+        }
+    }
+    
+    // No valid token found
+    return false;
 }
 
 // Redirect to login if not authenticated
@@ -194,19 +244,104 @@ async function register(userData) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
             },
-            body: JSON.stringify(userData),
+            body: JSON.stringify(userData)
         });
-        
-        if (response.ok) {
-            return await response.json();
-        } else {
+
+        if (!response.ok) {
             const errorData = await response.json();
-            const errorMessage = Object.values(errorData).flat().join(', ');
-            throw new Error(errorMessage || 'Registration failed');
+            let errorMessage = 'Registration failed';
+            
+            // Format error messages from the API
+            if (errorData) {
+                const errors = Object.entries(errorData)
+                    .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(' ') : messages}`)
+                    .join('\n');
+                errorMessage = errors || errorMessage;
+            }
+            
+            throw new Error(errorMessage);
         }
+
+        return await response.json();
     } catch (error) {
         console.error('Registration error:', error);
+        throw error;
+    }
+}
+
+// Request password reset function
+async function requestPasswordReset(email) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/users/reset_password/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({ email })
+        });
+
+        // For security reasons, the API always returns 204 No Content
+        // whether the email exists or not to prevent user enumeration
+        if (response.status === 204 || response.ok) {
+            return true;
+        }
+
+        const errorData = await response.json();
+        let errorMessage = 'Failed to send password reset email';
+        
+        // Format error messages from the API
+        if (errorData) {
+            const errors = Object.entries(errorData)
+                .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(' ') : messages}`)
+                .join('\n');
+            errorMessage = errors || errorMessage;
+        }
+        
+        throw new Error(errorMessage);
+    } catch (error) {
+        console.error('Password reset request error:', error);
+        throw error;
+    }
+}
+
+// Confirm password reset function
+async function confirmPasswordReset(uid, token, newPassword, reNewPassword) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/auth/users/reset_password_confirm/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({
+                uid,
+                token,
+                new_password: newPassword,
+                re_new_password: reNewPassword
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            let errorMessage = 'Password reset failed';
+            
+            // Format error messages from the API
+            if (errorData) {
+                const errors = Object.entries(errorData)
+                    .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(' ') : messages}`)
+                    .join('\n');
+                errorMessage = errors || errorMessage;
+            }
+            
+            throw new Error(errorMessage);
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Password reset confirmation error:', error);
         throw error;
     }
 }
@@ -659,6 +794,8 @@ const app = {
     login,
     register,
     logout,
+    requestPasswordReset,
+    confirmPasswordReset,
     formatDate,
     showNotification,
     getCsrfToken

@@ -26,6 +26,10 @@ def jwt_login_required(function=None, redirect_url='/login/'):
             # Enhanced check for login page and related paths to prevent redirect loops
             if request.path.startswith(redirect_url) or request.path.endswith('/login/') or '/login' in request.path:
                 logger.debug(f"Login-related page detected, allowing through: {request.path}")
+                # Clear any auth headers to ensure we're truly anonymous on login pages
+                if 'HTTP_AUTHORIZATION' in request.META:
+                    del request.META['HTTP_AUTHORIZATION']
+                    logger.debug("Removed Authorization header on login page in decorator")
                 return view_func(request, *args, **kwargs)
                 
             # Also check URL parameters for logout indicators

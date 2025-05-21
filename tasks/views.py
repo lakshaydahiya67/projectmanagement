@@ -344,8 +344,32 @@ class TaskViewSet(viewsets.ModelViewSet):
             return Response(status=status.HTTP_204_NO_CONTENT)
     
     def get_queryset(self):
+        # Handle Swagger schema generation
+        if getattr(self, 'swagger_fake_view', False):
+            return Task.objects.none()
+            
+        # Check if this is a direct route or a nested route
         column_id = self.kwargs.get('column_pk')
-        return Task.objects.filter(column_id=column_id)
+        task_id = self.kwargs.get('pk') or self.kwargs.get('task_id')
+        
+        # If we have a specific task ID and no column ID, return just that task
+        if task_id and not column_id:
+            return Task.objects.filter(id=task_id)
+        
+        # If we have a column ID, filter by column
+        if column_id:
+            return Task.objects.filter(column_id=column_id)
+            
+        # Default case: return all tasks the user has access to
+        # Get all projects the user is a member of
+        user_projects = Project.objects.filter(
+            members__user=self.request.user
+        )
+        
+        # Return all tasks in columns that belong to boards in those projects
+        return Task.objects.filter(
+            column__board__project__in=user_projects
+        )
     
     def get_serializer_class(self):
         if self.action == 'retrieve':
@@ -366,11 +390,21 @@ class TaskViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         column_id = self.kwargs.get('column_pk')
-        column = get_object_or_404(Column, id=column_id)
         
-        # Print debug information about the serializer and request
-        print(f"Creating task with column_id: {column_id}")
-        print(f"Serializer data: {serializer.validated_data}")
+        # Direct route case - column should be provided in the request data
+        if not column_id:
+            column_id = serializer.validated_data.get('column')
+            if not column_id:
+                raise serializers.ValidationError({"column": "Column ID is required"})
+            column = get_object_or_404(Column, id=column_id)
+        else:
+            # Nested route case
+            column = get_object_or_404(Column, id=column_id)
+        
+        # Verify the user has access to this column's project
+        project = column.board.project
+        if not ProjectMember.objects.filter(project=project, user=self.request.user).exists():
+            raise permissions.PermissionDenied("You do not have permission to create tasks in this column.")
         
         task = serializer.save(column=column, created_by=self.request.user)
         

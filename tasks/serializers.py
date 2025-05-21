@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Label, Task, Comment, Attachment
 from users.serializers import UserSerializer
+from projects.models import Column, ProjectMember
 
 class LabelSerializer(serializers.ModelSerializer):
     class Meta:
@@ -54,6 +55,12 @@ class TaskSerializer(serializers.ModelSerializer):
     is_overdue = serializers.BooleanField(read_only=True)
     column_name = serializers.CharField(source='column.name', read_only=True)
     
+    # For direct API access, we need to make column writable
+    column = serializers.PrimaryKeyRelatedField(
+        queryset=Column.objects.all(),
+        help_text="Column ID where the task belongs"
+    )
+    
     class Meta:
         model = Task
         fields = [
@@ -63,6 +70,15 @@ class TaskSerializer(serializers.ModelSerializer):
             'assignees', 'estimated_hours', 'actual_hours', 'is_overdue'
         ]
         read_only_fields = ['created_by', 'created_at', 'updated_at', 'is_overdue']
+    
+    def validate_column(self, value):
+        # Ensure the user has access to this column's project
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            project = value.board.project
+            if not ProjectMember.objects.filter(project=project, user=request.user).exists():
+                raise serializers.ValidationError("You do not have permission to create tasks in this column.")
+        return value
     
     def create(self, validated_data):
         user = self.context['request'].user

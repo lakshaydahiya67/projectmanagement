@@ -19,6 +19,10 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     ordering = ['-created_at']
     
     def get_queryset(self):
+        # Check if this is a schema generation request for Swagger
+        if getattr(self, 'swagger_fake_view', False):
+            return Notification.objects.none()
+            
         # Only show notifications for the current user
         return Notification.objects.filter(recipient=self.request.user)
     

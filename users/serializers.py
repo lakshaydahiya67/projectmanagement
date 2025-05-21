@@ -21,6 +21,7 @@ class UserSerializer(serializers.ModelSerializer):
                   'profile_picture', 'phone_number', 'job_title', 'bio', 
                   'date_joined', 'last_modified', 'preferences']
         read_only_fields = ['date_joined', 'last_modified']
+        ref_name = 'ProjectUser'  # Unique reference name for Swagger
 
 class UserDetailSerializer(UserSerializer):
     class Meta(UserSerializer.Meta):

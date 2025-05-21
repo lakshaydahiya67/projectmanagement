@@ -12,6 +12,12 @@ def get_user_from_request(request):
     """
     Extract and validate JWT token from request, then return the corresponding user
     """
+    # Skip JWT authentication for admin paths - use Django's built-in auth instead
+    if request.path.startswith('/admin/'):
+        logger.debug(f"Admin path detected: {request.path}, skipping JWT authentication")
+        # Return None to let Django's auth middleware handle it
+        return None
+        
     # Multi-layered logout detection - check multiple sources to ensure we detect logout state
     
     # 1. Check for recent logout via cookie
@@ -55,8 +61,15 @@ def get_user_from_request(request):
         return request._jwt_user_cached
         
     # Check for login page - if we're on login page, user should be anonymous
-    if request.path.endswith('/login/') or request.path == '/login':
+    if (request.path.endswith('/login/') or request.path == '/login') and not request.path.startswith('/admin/'):
         logger.debug(f"Login page detected: {request.path}, returning AnonymousUser")
+        # Remove any Authorization header to prevent authentication attempts on login page
+        if 'HTTP_AUTHORIZATION' in request.META:
+            del request.META['HTTP_AUTHORIZATION']
+            logger.debug("Removed Authorization header on login page")
+        # Clear any cached authentication
+        if hasattr(request, '_jwt_user_cached'):
+            delattr(request, '_jwt_user_cached')
         request._jwt_user_cached = AnonymousUser()
         return request._jwt_user_cached
     
@@ -213,6 +226,12 @@ class JWTAuthenticationMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        # Skip JWT authentication for admin paths
+        if request.path.startswith('/admin/'):
+            # Let Django's built-in auth middleware handle admin authentication
+            logger.debug(f"Admin path detected in middleware: {request.path}, bypassing JWT authentication")
+            return self.get_response(request)
+            
         # Clear any cached authentication for this request
         if hasattr(request, '_jwt_user_cached'):
             delattr(request, '_jwt_user_cached')

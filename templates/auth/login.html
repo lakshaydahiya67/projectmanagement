@@ -11,6 +11,9 @@
                     <h4 class="mb-0">Log In to Your Account</h4>
                 </div>
                 <div class="card-body p-4">
+                    <div class="alert alert-success d-none" id="reset-success" role="alert">
+                        Your password has been successfully reset. You can now log in with your new password.
+                    </div>
                     <div class="alert alert-danger d-none" id="login-error" role="alert"></div>
                     
                     <form id="login-form">
@@ -52,8 +55,27 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Check if already logged in - but only redirect if we're not coming from an activation page
         const fromActivation = new URLSearchParams(window.location.search).get('from') === 'activation';
+        const hasNextParam = new URLSearchParams(window.location.search).has('next');
+        const fromReset = new URLSearchParams(window.location.search).get('reset') === 'success';
         
-        if (!fromActivation && app.isAuthenticated()) {
+        // Show success message if coming from password reset
+        if (fromReset) {
+            const resetSuccess = document.getElementById('reset-success');
+            if (resetSuccess) {
+                resetSuccess.classList.remove('d-none');
+                // Auto-hide after 5 seconds
+                setTimeout(() => {
+                    resetSuccess.classList.add('d-none');
+                }, 5000);
+            }
+        }
+        
+        // Only redirect to dashboard if:  
+        // 1. We're not coming from an activation page
+        // 2. We're not being redirected from another page (no 'next' parameter)
+        // 3. We're not coming from a password reset
+        // 4. We're actually authenticated
+        if (!fromActivation && !hasNextParam && !fromReset && app.isAuthenticated()) {
             window.location.href = '/dashboard/';
             return;
         }

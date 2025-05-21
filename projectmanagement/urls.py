@@ -102,6 +102,8 @@ urlpatterns = [
     path('', TemplateView.as_view(template_name='dashboard/index.html'), name='home'),
     path('login/', TemplateView.as_view(template_name='auth/login.html'), name='login'),
     path('register/', TemplateView.as_view(template_name='auth/register.html'), name='register'),
+    path('forgot-password/', TemplateView.as_view(template_name='auth/forgot_password.html'), name='forgot_password'),
+    path('password/reset/confirm/<str:uid>/<str:token>/', TemplateView.as_view(template_name='auth/password_reset_confirm.html'), name='password_reset_confirm'),
     path('dashboard/', dashboard_view, name='dashboard'),
     path('projects/<uuid:project_id>/', project_detail_view, name='project_detail'),
     path('projects/<uuid:project_id>/delete/', project_delete_view, name='project_delete'),

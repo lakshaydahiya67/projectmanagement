@@ -15,6 +15,7 @@ class ActivityLogSerializer(serializers.ModelSerializer):
             'details', 'timestamp'
         ]
         read_only_fields = fields
+        ref_name = 'ActivityLogAnalytics'  # Unique reference name for Swagger
 
 class ProjectMetricSerializer(serializers.ModelSerializer):
     project_name = serializers.CharField(source='project.name', read_only=True)

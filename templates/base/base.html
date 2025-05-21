@@ -56,7 +56,7 @@
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                             <li><a class="dropdown-item" href="/profile/">Profile</a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="#" id="logout-link">Logout</a></li>
+                            <li><a class="dropdown-item" href="/accounts/logout/" id="logout-link">Logout</a></li>
                         </ul>
                     </li>
                     {% else %}
@@ -125,38 +125,25 @@
     <!-- Custom JavaScript -->
     <script src="{% static 'js/main.js' %}"></script>
     <script>
-        // Logout functionality - supports both token-based and session-based auth
+        // Optimized logout functionality - directly redirects to logout endpoint
         document.getElementById('logout-link')?.addEventListener('click', function(e) {
             e.preventDefault();
             
-            // Get CSRF token for the request
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+            // Clear any tokens in localStorage and sessionStorage
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
             
-            // First attempt to use token-based logout if tokens exist in localStorage
-            if (localStorage.getItem('access_token')) {
-                fetch('/api/v1/auth/token/logout/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken,
-                        'Authorization': 'Bearer ' + localStorage.getItem('access_token')
-                    }
-                }).then(response => {
-                    // Clear localStorage tokens
-                    localStorage.removeItem('access_token');
-                    localStorage.removeItem('refresh_token');
-                    
-                    // Redirect to login page
-                    window.location.href = '/login/';
-                }).catch(error => {
-                    console.error('Error during token logout:', error);
-                    // Fallback to session-based logout
-                    window.location.href = '/accounts/logout/';
-                });
-            } else {
-                // Use session-based logout if no tokens exist
-                window.location.href = '/accounts/logout/';
+            if (window.sessionStorage) {
+                sessionStorage.removeItem('access_token');
+                sessionStorage.removeItem('refresh_token');
             }
+            
+            // Set logout timestamp to prevent redirect loops
+            const timestamp = Math.floor(Date.now() / 1000);
+            document.cookie = `logout_timestamp=${timestamp}; path=/; max-age=300`;
+            
+            // Directly redirect to the logout URL
+            window.location.href = '/accounts/logout/';
         });
     </script>
     {% block extra_js %}{% endblock %}

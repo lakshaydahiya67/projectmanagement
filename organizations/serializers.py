@@ -28,9 +28,22 @@ class OrganizationMemberSerializer(serializers.ModelSerializer):
         read_only_fields = ['joined_at']
 
 class OrganizationMemberUpdateSerializer(serializers.ModelSerializer):
+    role = serializers.ChoiceField(
+        choices=OrganizationMember.ROLE_CHOICES,
+        required=True,
+        help_text="User's role in the organization (admin, manager, or member)"
+    )
+    
     class Meta:
         model = OrganizationMember
         fields = ['role']
+        
+    def validate_role(self, value):
+        # Ensure the role is valid
+        valid_roles = [role[0] for role in OrganizationMember.ROLE_CHOICES]
+        if value not in valid_roles:
+            raise serializers.ValidationError(f"Invalid role. Must be one of: {', '.join(valid_roles)}")
+        return value
 
 class OrganizationInvitationSerializer(serializers.ModelSerializer):
     organization_name = serializers.CharField(source='organization.name', read_only=True)
@@ -45,7 +58,7 @@ class OrganizationInvitationSerializer(serializers.ModelSerializer):
             'invited_by', 'invited_by_name', 'token', 'created_at', 
             'expires_at', 'accepted', 'is_expired'
         ]
-        read_only_fields = ['token', 'created_at', 'expires_at', 'accepted', 'invited_by', 'organization']
+        read_only_fields = ['created_at', 'expires_at', 'accepted', 'invited_by', 'organization']
         extra_kwargs = {
             'token': {'write_only': True}
         }
