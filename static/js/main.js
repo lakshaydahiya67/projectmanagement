@@ -5,7 +5,8 @@ const API_BASE_URL = '/api/v1';
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
         try {
-            const registration = await navigator.serviceWorker.register('/static/js/auth-service-worker.js', {
+            // Use the service worker at the root path which doesn't need special headers
+            const registration = await navigator.serviceWorker.register('/auth-service-worker.js', {
                 scope: '/'
             });
             console.log('Auth Service Worker registered with scope:', registration.scope);
@@ -21,6 +22,18 @@ if ('serviceWorker' in navigator) {
             }
         } catch (error) {
             console.error('Auth Service Worker registration failed:', error);
+            
+            // If there's an error, try to unregister any existing service workers
+            try {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for (let registration of registrations) {
+                    await registration.unregister();
+                    console.log('Unregistered service worker with scope:', registration.scope);
+                }
+                console.log('All service workers unregistered, please refresh the page');
+            } catch (unregError) {
+                console.error('Error unregistering service workers:', unregError);
+            }
         }
     });
 }
@@ -123,8 +136,15 @@ async function fetchAPI(url, options = {}) {
     // Always include credentials to send cookies with every request
     options.credentials = 'same-origin';
     
-    // Add authorization header if token exists
-    const token = localStorage.getItem('access_token');
+    // Add authorization header if token exists (check multiple storage locations)
+    let token = localStorage.getItem('access_token');
+    if (!token && window.sessionStorage) {
+        token = sessionStorage.getItem('access_token');
+    }
+    if (!token) {
+        token = getCookie('access_token');
+    }
+    
     if (token) {
         options.headers['Authorization'] = `Bearer ${token}`;
     }
@@ -197,34 +217,44 @@ async function refreshToken() {
 }
 
 // Login function
-async function login(email, password) {
+async function login(email, password, rememberMe = false) {
     try {
         const response = await fetch(`${API_BASE_URL}/auth/jwt/create/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ email, password }),
+            body: JSON.stringify({ email, password, remember_me: rememberMe }),
             credentials: 'same-origin' // Include cookies in the request
         });
         
         if (response.ok) {
             const data = await response.json();
             
-            // Store tokens in localStorage for JavaScript access
+            // Store tokens in both localStorage and cookie to ensure they're available
+            // for all API requests regardless of how they're made
             localStorage.setItem('access_token', data.access);
             localStorage.setItem('refresh_token', data.refresh);
             
-            // Also store access token in cookie for middleware access
-            // Set cookie to expire when the token expires (typically 1 hour)
-            document.cookie = `access_token=${data.access}; path=/; max-age=3600; SameSite=Lax`;
-            
-            // Also store in session to have multiple fallback mechanisms
+            // Also store in sessionStorage for redundancy
             if (window.sessionStorage) {
                 sessionStorage.setItem('access_token', data.access);
+                sessionStorage.setItem('refresh_token', data.refresh);
             }
             
-            console.log('Login successful, JWT token stored');
+            // Set cookie with appropriate expiration
+            const expirationSeconds = rememberMe ? (30 * 24 * 60 * 60) : 3600; // 30 days or 1 hour
+            document.cookie = `access_token=${data.access}; path=/; max-age=${expirationSeconds}; SameSite=Lax`;
+            
+            // Ensure the token is immediately available for the service worker
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({
+                    type: 'SET_AUTH_TOKEN',
+                    token: data.access
+                });
+            }
+            
+            console.log(`Login successful, JWT token stored with remember-me=${rememberMe}`);
             return true;
         } else {
             const errorData = await response.json();
@@ -274,12 +304,14 @@ async function register(userData) {
 // Request password reset function
 async function requestPasswordReset(email) {
     try {
-        const response = await fetch(`${API_BASE_URL}/auth/users/reset_password/`, {
+        // Use our completely public endpoint that bypasses all authentication
+        const response = await fetch(`/api/v1/public/password-reset/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCsrfToken()
             },
+            credentials: 'omit', // Don't send cookies or auth credentials
             body: JSON.stringify({ email })
         });
 

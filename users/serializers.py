@@ -82,10 +82,27 @@ class UserCreateSerializer(serializers.ModelSerializer):
         return user
 
 class UserUpdateSerializer(serializers.ModelSerializer):
+    profile_picture = serializers.ImageField(required=False, allow_null=True)
+    
     class Meta:
         model = User
         fields = ['first_name', 'last_name', 'profile_picture', 'phone_number', 
                   'job_title', 'bio']
+    
+    def update(self, instance, validated_data):
+        # Handle profile picture update separately
+        profile_picture = validated_data.pop('profile_picture', None)
+        
+        # Update all other fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        # Only update profile_picture if it was provided in the request
+        if profile_picture is not None:
+            instance.profile_picture = profile_picture
+            
+        instance.save()
+        return instance
 
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(required=True, style={'input_type': 'password'})

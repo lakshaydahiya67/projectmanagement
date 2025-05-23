@@ -30,8 +30,9 @@ import redis
 import os
 from organizations.views import organization_detail_view, organization_list_view, organization_update_view, organization_delete_view
 from projects.views import project_detail_view, board_detail_view, project_delete_view, project_create_view
+from projects.views_edit import project_update_view
 from tasks.views import task_detail_view, task_create_view, task_update_view
-from .views import dashboard_view, activation_view, logout_view, complete_logout
+from .views import dashboard_view, activation_view, logout_view, complete_logout, serve_service_worker
 
 def health_check(request):
     """Health check endpoint for Docker that verifies database and Redis connections"""
@@ -81,6 +82,9 @@ api_patterns = [
     path('auth/token/logout/', logout_view, name='token_logout'),  # Custom logout handler
     path('auth/complete-logout/', complete_logout, name='complete_logout'),  # Final logout step handler
     
+    # Public endpoints that bypass authentication
+    path('public/password-reset/', include('users.public_urls')),  # Direct access to public password reset
+    
     # App-specific API endpoints
     path('users/', include('users.urls')),
     path('organizations/', include('organizations.urls')),
@@ -106,6 +110,7 @@ urlpatterns = [
     path('password/reset/confirm/<str:uid>/<str:token>/', TemplateView.as_view(template_name='auth/password_reset_confirm.html'), name='password_reset_confirm'),
     path('dashboard/', dashboard_view, name='dashboard'),
     path('projects/<uuid:project_id>/', project_detail_view, name='project_detail'),
+    path('projects/<uuid:project_id>/edit/', project_update_view, name='project_edit'),
     path('projects/<uuid:project_id>/delete/', project_delete_view, name='project_delete'),
     path('projects/<uuid:project_id>/boards/<uuid:board_id>/', board_detail_view, name='board_detail'),
     path('projects/<uuid:project_id>/tasks/create/', task_create_view, name='task_create'),
@@ -133,6 +138,12 @@ urlpatterns = [
     # API Documentation
     re_path(r'^api/docs/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     re_path(r'^api/redoc/$', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+]
+
+# Add service worker routes - these must be before the static files patterns
+urlpatterns += [
+    path('static/js/auth-service-worker.js', serve_service_worker, name='service_worker'),
+    path('auth-service-worker.js', serve_service_worker, name='root_service_worker'),
 ]
 
 # Serve static and media files in development

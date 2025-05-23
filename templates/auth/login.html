@@ -100,7 +100,8 @@
             const password = document.getElementById('password').value;
             
             try {
-                const success = await app.login(email, password);
+                const rememberMe = document.getElementById('remember-me').checked;
+                const success = await app.login(email, password, rememberMe);
                 if (success) {
                     window.location.href = '/dashboard/';
                 }

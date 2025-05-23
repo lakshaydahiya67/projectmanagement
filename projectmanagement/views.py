@@ -1,12 +1,15 @@
 from django.shortcuts import render, redirect
 from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
-from django.http import JsonResponse, HttpResponse, HttpResponseRedirect
+from django.http import JsonResponse, HttpResponse, HttpResponseRedirect, FileResponse
 from django.views.decorators.http import require_POST
+from django.views.decorators.cache import cache_control
 from rest_framework_simplejwt.tokens import RefreshToken
 import time
+import os
 from rest_framework import status
 from projects.models import Project, ProjectMember
 from organizations.models import Organization, OrganizationMember
+from django.conf import settings
 import logging
 
 logger = logging.getLogger(__name__)
@@ -198,4 +201,35 @@ def complete_logout(request):
     response['Expires'] = '0'
     
     logger.debug(f"Complete-logout request completed successfully")
+    return response
+
+
+@cache_control(max_age=0, no_cache=True, no_store=True, must_revalidate=True)
+def serve_service_worker(request):
+    """
+    Serve the service worker file with the correct Service-Worker-Allowed header
+    """
+    # First check for the service worker at the root (preferred location)
+    root_file_path = os.path.join(settings.BASE_DIR, 'auth-service-worker.js')
+    
+    if os.path.exists(root_file_path):
+        logger.info(f"Serving service worker from root directory: {root_file_path}")
+        file_path = root_file_path
+    else:
+        # Fall back to the static directory locations
+        file_path = os.path.join(settings.STATIC_ROOT, 'js', 'auth-service-worker.js')
+        if not os.path.exists(file_path):
+            # Fall back to the static files directory in the project
+            file_path = os.path.join(settings.BASE_DIR, 'static', 'js', 'auth-service-worker.js')
+            logger.info(f"Serving service worker from static directory: {file_path}")
+    
+    # Create a response with the file content
+    response = FileResponse(open(file_path, 'rb'), content_type='application/javascript')
+    
+    # Add the Service-Worker-Allowed header
+    response['Service-Worker-Allowed'] = '/'
+    
+    # Log that we're serving the service worker
+    logger.info(f"Serving service worker with Service-Worker-Allowed header from {file_path}")
+    
     return response

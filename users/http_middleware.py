@@ -12,11 +12,14 @@ def get_user_from_request(request):
     """
     Extract and validate JWT token from request, then return the corresponding user
     """
-    # Skip JWT authentication for admin paths - use Django's built-in auth instead
-    if request.path.startswith('/admin/'):
-        logger.debug(f"Admin path detected: {request.path}, skipping JWT authentication")
-        # Return None to let Django's auth middleware handle it
-        return None
+    # Skip JWT authentication for admin paths and public endpoints
+    if request.path.startswith('/admin/') or \
+       request.path.endswith('/password-reset/') or \
+       'reset_password' in request.path or \
+       'forgot-password' in request.path:
+        logger.debug(f"Public path detected: {request.path}, skipping JWT authentication")
+        # Return AnonymousUser to ensure the request continues without authentication
+        return AnonymousUser()
         
     # Multi-layered logout detection - check multiple sources to ensure we detect logout state
     
@@ -226,10 +229,14 @@ class JWTAuthenticationMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        # Skip JWT authentication for admin paths
-        if request.path.startswith('/admin/'):
+        # Skip JWT authentication for admin paths and public endpoints
+        if request.path.startswith('/admin/') or \
+           request.path.endswith('/password-reset/') or \
+           'reset_password' in request.path or \
+           'forgot-password' in request.path:
             # Let Django's built-in auth middleware handle admin authentication
-            logger.debug(f"Admin path detected in middleware: {request.path}, bypassing JWT authentication")
+            # and allow public access to password reset endpoints
+            logger.debug(f"Public path detected in middleware: {request.path}, bypassing JWT authentication")
             return self.get_response(request)
             
         # Clear any cached authentication for this request

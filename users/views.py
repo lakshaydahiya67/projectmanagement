@@ -1,19 +1,25 @@
 from rest_framework import viewsets, generics, status, permissions
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes, authentication_classes
+from .permissions import AllowPasswordReset
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.contrib.contenttypes.models import ContentType
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
+from django.contrib.auth.tokens import default_token_generator
 from .models import UserPreference
 from .serializers import (
     UserSerializer, UserDetailSerializer, UserCreateSerializer, 
     UserUpdateSerializer, UserPreferenceSerializer, ChangePasswordSerializer
 )
 from .permissions import IsUserOrReadOnly, IsUserOwner
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
 from django.conf import settings
-from .email import PasswordResetEmail, ActivationEmail
+from .email import PasswordResetEmail, ActivationEmail, send_password_reset_email
 import logging
 
 # Try to import ActivityLog model if available
@@ -118,10 +124,36 @@ class UserViewSet(viewsets.ModelViewSet):
             
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get', 'put', 'patch'])
     def me(self, request):
-        serializer = UserDetailSerializer(request.user)
-        return Response(serializer.data)
+        user = request.user
+        
+        if request.method == 'GET':
+            serializer = UserDetailSerializer(user)
+            return Response(serializer.data)
+        
+        elif request.method in ['PUT', 'PATCH']:
+            # Use UserUpdateSerializer for updates
+            serializer = UserUpdateSerializer(user, data=request.data, partial=request.method == 'PATCH')
+            
+            if serializer.is_valid():
+                with transaction.atomic():
+                    # Save the user instance
+                    serializer.save()
+                    
+                    # Log the update if activity logs are enabled
+                    if ACTIVITY_LOGS_ENABLED:
+                        ActivityLog.objects.create(
+                            user=request.user,
+                            content_type=ContentType.objects.get_for_model(user),
+                            object_id=str(user.id),
+                            action_type=ActivityLog.UPDATED,
+                            description="User profile updated"
+                        )
+                
+                return Response(UserDetailSerializer(user).data)
+            
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class UserPreferenceView(generics.RetrieveUpdateAPIView):
     """
@@ -152,6 +184,63 @@ class UserPreferenceView(generics.RetrieveUpdateAPIView):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@authentication_classes([])
+def custom_password_reset(request):
+    """
+    Custom password reset view that directly uses our email sending logic.
+    This overrides Djoser's default password reset view.
+    """
+    # Log the request for debugging
+    logger.info(f"Password reset request received for: {request.data.get('email', 'unknown')}"
+               f" from {request.META.get('REMOTE_ADDR')}"
+               f" with auth: {request.META.get('HTTP_AUTHORIZATION', 'None')}")
+    email = request.data.get('email', '')
+    if not email:
+        return Response({"detail": "Email is required."}, 
+                        status=status.HTTP_400_BAD_REQUEST)
+    
+    # Find the user by email
+    UserModel = get_user_model()
+    try:
+        user = UserModel.objects.get(email=email)
+        logger.info(f"Found user with email {email}")
+    except UserModel.DoesNotExist:
+        # For security reasons, don't reveal that the user doesn't exist
+        logger.info(f"No user found with email {email}")
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    # Generate password reset token
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = default_token_generator.make_token(user)
+    
+    # Create reset URL
+    domain = settings.DJOSER.get('DOMAIN')
+    protocol = 'https' if settings.DJOSER.get('USE_HTTPS', False) else 'http'
+    url_template = settings.DJOSER.get('PASSWORD_RESET_CONFIRM_URL')
+    reset_url = f"{protocol}://{domain}/{url_template.format(uid=uid, token=token)}"
+    
+    logger.info(f"Generated reset URL: {reset_url}")
+    
+    try:
+        # Send password reset email using our custom function
+        result = send_password_reset_email(user, reset_url)
+        
+        if result:
+            logger.info(f"Password reset email sent successfully to {email}")
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            logger.error(f"Failed to send password reset email to {email}")
+            return Response({"detail": "Failed to send password reset email."}, 
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        logger.exception(f"Error sending password reset email: {str(e)}")
+        return Response({"detail": "An error occurred while sending the password reset email."}, 
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@authentication_classes([])
 def test_reset_email(request):
     """
     Test endpoint to verify password reset email functionality.

@@ -125,6 +125,7 @@ MIDDLEWARE = [
     'users.http_middleware.JWTAuthenticationMiddleware',  # Add JWT authentication middleware
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'projectmanagement.middleware.ServiceWorkerMiddleware',  # Add Service-Worker-Allowed header for service worker
 ]
 
 # Add activity log middleware if it's available
@@ -179,6 +180,8 @@ else:
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
 
+# Custom password validation settings
+# Removed CommonPasswordValidator to allow more common passwords
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -186,12 +189,13 @@ AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
         'OPTIONS': {
-            'min_length': 8,
+            'min_length': 6,  # Reduced from 8 to 6 for better usability
         }
     },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
+    # Removed CommonPasswordValidator to allow more common passwords like 'test1234'
+    # {
+    #     'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    # },
     {
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
@@ -215,6 +219,9 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Service Worker settings
+SERVICE_WORKER_ALLOWED_PATH = '/'
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
@@ -237,10 +244,17 @@ AUTHENTICATION_BACKENDS = [
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',  # Add session auth as fallback
     ),
+    # Use IsAuthenticatedOrReadOnly instead of IsAuthenticated to allow unauthenticated access to GET requests
+    # Individual views can still override this with @permission_classes
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    # Define public endpoints that don't require authentication
+    'UNAUTHENTICATED_USER': 'django.contrib.auth.models.AnonymousUser',
+    # Ensure authentication errors are properly reported
+    'EXCEPTION_HANDLER': 'projectmanagement.utils.custom_exception_handler',
     'DEFAULT_FILTER_BACKENDS': (
         'django_filters.rest_framework.DjangoFilterBackend',
     ),

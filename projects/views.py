@@ -317,55 +317,93 @@ def project_create_view(request, org_id):
             'message': 'You do not have permission to create projects in this organization.'
         }, status=403)
     
+    # Initialize errors dictionary
+    errors = {}
+    
     if request.method == 'POST':
         # Process form data
-        name = request.POST.get('name')
-        description = request.POST.get('description')
-        start_date = request.POST.get('start_date')
-        end_date = request.POST.get('end_date')
+        name = request.POST.get('name', '').strip()
+        description = request.POST.get('description', '').strip()
+        start_date = request.POST.get('start_date', '').strip()
+        end_date = request.POST.get('end_date', '').strip()
         is_public = request.POST.get('is_public') == 'on'
         
-        if name:  # Name is required
-            # Create the project
-            project = Project.objects.create(
-                name=name,
-                description=description,
-                organization=organization,
-                start_date=start_date if start_date else None,
-                end_date=end_date if end_date else None,
-                is_public=is_public
-            )
-            
-            # Add the creator as a project admin
-            ProjectMember.objects.create(
-                project=project,
-                user=request.user,
-                role='ADMIN'
-            )
-            
-            # Create a default board for the project
-            board = Board.objects.create(
-                project=project,
-                name='Default Board',
-                description='Default project board'
-            )
-            
-            # Create default columns for the board
-            columns = [
-                {'name': 'To Do', 'order': 1},
-                {'name': 'In Progress', 'order': 2},
-                {'name': 'Done', 'order': 3}
-            ]
-            
-            for column_data in columns:
-                Column.objects.create(
-                    board=board,
-                    name=column_data['name'],
-                    order=column_data['order']
+        # Validate required fields
+        if not name:
+            errors['name'] = 'Project name is required.'
+        
+        # Validate dates if provided
+        if start_date and end_date:
+            from datetime import datetime
+            try:
+                start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+                end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+                
+                if end_date_obj < start_date_obj:
+                    errors['end_date'] = 'End date cannot be earlier than start date.'
+            except ValueError:
+                if start_date and not start_date.strip():
+                    errors['start_date'] = 'Invalid start date format. Use YYYY-MM-DD.'
+                if end_date and not end_date.strip():
+                    errors['end_date'] = 'Invalid end date format. Use YYYY-MM-DD.'
+        
+        # If no errors, create the project
+        if not errors:
+            try:
+                # Create the project
+                project = Project.objects.create(
+                    name=name,
+                    description=description,
+                    organization=organization,
+                    created_by=request.user,
+                    start_date=start_date if start_date else None,
+                    end_date=end_date if end_date else None,
+                    is_public=is_public
                 )
-            
-            # Redirect to the project detail page
-            return redirect('project_detail', project_id=project.id)
+                
+                # Add the creator as a project owner
+                ProjectMember.objects.create(
+                    project=project,
+                    user=request.user,
+                    role=ProjectMember.OWNER
+                )
+                
+                # Create a default board for the project
+                board = Board.objects.create(
+                    project=project,
+                    name='Default Board',
+                    description='Default project board',
+                    created_by=request.user,
+                    is_default=True
+                )
+                
+                # Create default columns for the board
+                columns = [
+                    {'name': 'To Do', 'order': 0},
+                    {'name': 'In Progress', 'order': 1},
+                    {'name': 'Done', 'order': 2}
+                ]
+                
+                for column_data in columns:
+                    Column.objects.create(
+                        board=board,
+                        name=column_data['name'],
+                        order=column_data['order']
+                    )
+                
+                # Redirect to the project detail page
+                return redirect('project_detail', project_id=project.id)
+            except Exception as e:
+                # Log the error
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error creating project: {str(e)}")
+                errors['general'] = f"An error occurred while creating the project: {str(e)}"
     
-    # Render the project creation form
-    return render(request, 'project/create.html', {'organization': organization})
+    # Render the project creation form with any errors
+    context = {
+        'organization': organization,
+        'errors': errors,
+        'form_data': request.POST if request.method == 'POST' else None
+    }
+    return render(request, 'project/create.html', context)

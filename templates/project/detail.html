@@ -17,7 +17,7 @@
             </p>
         </div>
         <div class="col-md-4 text-end">
-            <a href="#" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editProjectModal">Edit Project</a>
+            <a href="{% url 'project_edit' project.id %}" class="btn btn-primary btn-sm">Edit Project</a>
             {% if request.user == project.owner or request.user.is_staff %}
             <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteProjectModal">Delete Project</button>
             {% endif %}
@@ -200,10 +200,11 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
+                <div id="addMemberError" class="alert alert-danger d-none" role="alert"></div>
                 <form id="addProjectMemberForm">
                     <div class="mb-3">
-                        <label for="memberEmail" class="form-label">User's Email or Username</label>
-                        <input type="text" class="form-control" id="memberEmail" placeholder="Enter email or username" required>
+                        <label for="memberEmail" class="form-label">User's Email</label>
+                        <input type="email" class="form-control" id="memberEmail" placeholder="Enter email address" required>
                          <small>Only users already in the organization can be added to projects.</small>
                     </div>
                     <div class="mb-3">
@@ -211,8 +212,8 @@
                         <select class="form-select" id="memberRoleProject">
                             <option value="member">Member</option>
                             <option value="viewer">Viewer</option> 
-                            <option value="editor">Editor</option> 
-                            <!-- Add more roles as needed -->
+                            <option value="manager">Manager</option>
+                            <option value="admin">Admin</option>
                         </select>
                     </div>
                     <button type="submit" class="btn btn-primary">Add Member</button>
@@ -371,30 +372,79 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Add Project Member Form Submission
     const addProjectMemberForm = document.getElementById('addProjectMemberForm');
+    const addMemberError = document.getElementById('addMemberError');
+    
     if (addProjectMemberForm) {
         addProjectMemberForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            const userIdentifier = document.getElementById('memberEmail').value;
+            
+            // Hide any previous error messages
+            addMemberError.classList.add('d-none');
+            
+            // Get form values
+            const userEmail = document.getElementById('memberEmail').value;
             const role = document.getElementById('memberRoleProject').value;
+            
+            // Disable the submit button to prevent multiple submissions
+            const submitButton = addProjectMemberForm.querySelector('button[type="submit"]');
+            const originalButtonText = submitButton.textContent;
+            submitButton.disabled = true;
+            submitButton.textContent = 'Adding...';
 
             try {
-                const response = await fetch(`/api/v1/projects/${projectId}/members/`, {
+                // First, we need to find the user by email
+                const userSearchResponse = await fetch(`/api/v1/users/?email=${encodeURIComponent(userEmail)}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (!userSearchResponse.ok) {
+                    throw new Error('Failed to find user with this email');
+                }
+                
+                const userData = await userSearchResponse.json();
+                
+                if (!userData.results || userData.results.length === 0) {
+                    throw new Error('No user found with this email address');
+                }
+                
+                const userId = userData.results[0].id;
+                
+                // Now add the user to the project with the selected role
+                const response = await fetch(`/api/v1/projects/${projectId}/add_member/`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': csrfToken
                     },
-                    body: JSON.stringify({ user_identifier: userIdentifier, role: role })
+                    body: JSON.stringify({ user: userId, role: role })
                 });
+                
                 if (response.ok) {
-                    alert('Member added to project successfully!');
-                    fetchProjectMembers(); // Refresh member list
-                    var modal = bootstrap.Modal.getInstance(document.getElementById('addProjectMemberModal'));
-                    modal.hide();
+                    // Show success message
+                    const successAlert = document.createElement('div');
+                    successAlert.className = 'alert alert-success';
+                    successAlert.textContent = 'Member added to project successfully!';
+                    addProjectMemberForm.prepend(successAlert);
+                    
+                    // Refresh member list
+                    fetchProjectMembers();
+                    
+                    // Auto-hide the alert and close modal after 2 seconds
+                    setTimeout(() => {
+                        successAlert.remove();
+                        var modal = bootstrap.Modal.getInstance(document.getElementById('addProjectMemberModal'));
+                        modal.hide();
+                    }, 2000);
+                    
+                    // Reset the form
                     addProjectMemberForm.reset();
                 } else {
                     const errorData = await response.json();
-                    alert('Error adding member: ' + (errorData.detail || JSON.stringify(errorData)));
+                    addMemberError.textContent = 'Error adding member: ' + (errorData.detail || JSON.stringify(errorData));
+                    addMemberError.classList.remove('d-none');
                 }
             } catch (error) {
                 console.error('Error adding member to project:', error);

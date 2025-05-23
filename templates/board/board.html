@@ -258,8 +258,70 @@
 
 {% block extra_js %}
 <script>
-    // WebSocket connection
+    // Initialize app object if not already defined
+    if (typeof app === 'undefined') {
+        var app = {};
+    }
+    
+    // Define fetchAPI function for API requests
+    app.fetchAPI = async function(url, options = {}) {
+        // Add API prefix to the URL
+        const apiUrl = `/api/v1${url}`;
+        
+        // Set default headers
+        if (!options.headers) {
+            options.headers = {};
+        }
+        
+        // Add authorization header if token exists
+        const token = localStorage.getItem('access_token');
+        if (token) {
+            options.headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        // Add CSRF token for non-GET requests
+        if (options.method && options.method !== 'GET') {
+            options.headers['X-CSRFToken'] = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        }
+        
+        // Add content type for POST/PUT/PATCH requests
+        if (['POST', 'PUT', 'PATCH'].includes(options.method)) {
+            if (!options.headers['Content-Type'] && !(options.body instanceof FormData)) {
+                options.headers['Content-Type'] = 'application/json';
+            }
+        }
+        
+        // Make the request
+        return fetch(apiUrl, options);
+    };
+    
+    // Helper function to get CSRF token
+    app.getCsrfToken = function() {
+        return document.querySelector('[name=csrfmiddlewaretoken]').value;
+    };
+    // Initialize app variables
+    const projectId = "{{ project.id }}";
+    const boardId = "{{ board.id }}";
+    let boardData = null;
     let boardSocket = null;
+    let activeFilters = {
+        assignees: [],
+        labels: [],
+        priority: null
+    };
+    
+    // Load board data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadBoard(projectId, boardId);
+        
+        // Setup create task modal
+        setupCreateTaskModal(projectId, boardId);
+        
+        // Setup filter modal
+        setupFilterModal();
+    });
+    
+    // WebSocket connection
     
     // Initialize WebSocket connection
     function initWebSocket(boardId) {
@@ -375,14 +437,6 @@
         });
     });
     
-    // Global variables to store board data and filters
-    let boardData = null;
-    let filters = {
-        priorities: ['high', 'medium', 'low'],
-        assignee: '',
-        label: ''
-    };
-    
     // Load board data including columns and tasks
     async function loadBoard(projectId, boardId) {
         // Initialize WebSocket connection for this board
@@ -398,8 +452,8 @@
                 </div>
             `;
             
-            // First load the board itself
-            const boardResponse = await app.fetchAPI(`/boards/${boardId}/`);
+            // First load the board itself - using the correct API endpoint structure
+            const boardResponse = await app.fetchAPI(`/projects/${projectId}/boards/${boardId}/`);
             if (!boardResponse.ok) {
                 throw new Error('Failed to load board');
             }
@@ -413,11 +467,11 @@
             document.getElementById('board-description').textContent = board.description || '';
             
             // Update project link
-            document.getElementById('project-link').textContent = board.project_name || 'Project';
+            document.getElementById('project-link').textContent = '{{ project.name }}' || 'Project';
             document.getElementById('project-link').href = `/projects/${projectId}/`;
             
             // Now load the board columns (statuses) with tasks
-            const columnsResponse = await app.fetchAPI(`/boards/${boardId}/columns/`);
+            const columnsResponse = await app.fetchAPI(`/projects/${projectId}/boards/${boardId}/columns/`);
             if (!columnsResponse.ok) {
                 throw new Error('Failed to load board columns');
             }
@@ -610,33 +664,46 @@
     async function loadProjectMembers(projectId) {
         try {
             const response = await app.fetchAPI(`/projects/${projectId}/members/`);
-            if (!response.ok) throw new Error('Failed to load project members');
+            if (!response.ok) {
+                throw new Error('Failed to load project members');
+            }
             
             const members = await response.json();
             
-            // Populate the filter dropdown
-            const filterAssignee = document.getElementById('filter-assignee');
-            // Keep the first two options (All Users, Unassigned) and clear the rest
-            filterAssignee.innerHTML = `
-                <option value="">All Users</option>
-                <option value="_unassigned">Unassigned</option>
-            `;
+            // Populate assignee filter in filter modal
+            const assigneeFilter = document.getElementById('filter-assignees');
+            assigneeFilter.innerHTML = '';
             
-            // Populate the create task assignee dropdown
-            const taskAssignee = document.getElementById('task-assignee');
-            taskAssignee.innerHTML = '<option value="">None</option>';
+            // Check if members is an array or has a results property (pagination)
+            const membersList = Array.isArray(members) ? members : (members.results || []);
             
-            members.forEach(member => {
-                const filterOption = document.createElement('option');
-                filterOption.value = member.user.id;
-                filterOption.textContent = member.user.full_name || member.user.username;
-                filterAssignee.appendChild(filterOption);
-                
-                const taskOption = document.createElement('option');
-                taskOption.value = member.user.id;
-                taskOption.textContent = member.user.full_name || member.user.username;
-                taskAssignee.appendChild(taskOption);
+            membersList.forEach(member => {
+                const option = document.createElement('option');
+                // Handle different response structures
+                const userData = member.user || member;
+                option.value = userData.id;
+                option.textContent = userData.first_name && userData.last_name ? 
+                    `${userData.first_name} ${userData.last_name}` : 
+                    userData.email || userData.username;
+                assigneeFilter.appendChild(option);
             });
+            
+            // Also populate assignee dropdown in create task modal
+            const assigneeDropdown = document.getElementById('task-assignees');
+            if (assigneeDropdown) {
+                assigneeDropdown.innerHTML = '';
+                
+                membersList.forEach(member => {
+                    const option = document.createElement('option');
+                    // Handle different response structures
+                    const userData = member.user || member;
+                    option.value = userData.id;
+                    option.textContent = userData.first_name && userData.last_name ? 
+                        `${userData.first_name} ${userData.last_name}` : 
+                        userData.email || userData.username;
+                    assigneeDropdown.appendChild(option);
+                });
+            }
             
         } catch (error) {
             console.error('Error loading project members:', error);
