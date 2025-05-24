@@ -51,16 +51,21 @@ class UserViewSet(viewsets.ModelViewSet):
             
         if user.is_staff or user.is_superuser:
             return User.objects.all()
+        
+        # Always include the current user in the queryset
+        user_ids = {user.id}
             
         # Get organizations the user is a member of
         try:
             from organizations.models import OrganizationMember
             user_orgs = OrganizationMember.objects.filter(user=user).values_list('organization_id', flat=True)
             org_users = OrganizationMember.objects.filter(organization_id__in=user_orgs).values_list('user_id', flat=True)
-            return User.objects.filter(id__in=list(org_users))
+            user_ids.update(org_users)
         except ImportError:
-            # Organizations app not available, just return the current user
-            return User.objects.filter(id=user.id)
+            # Organizations app not available, only include the current user
+            pass
+            
+        return User.objects.filter(id__in=list(user_ids))
     
     def get_serializer_class(self):
         if self.action == 'create':

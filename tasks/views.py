@@ -1,4 +1,5 @@
 from rest_framework import viewsets, generics, permissions, status, filters
+from rest_framework import serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle, ScopedRateThrottle
@@ -72,6 +73,7 @@ class TaskViewSet(viewsets.ModelViewSet):
     """
     serializer_class = TaskSerializer
     permission_classes = [permissions.IsAuthenticated, IsProjectMember]
+    queryset = Task.objects.all()  # Default queryset for router registration
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['column', 'priority', 'assignees', 'labels']
     search_fields = ['title', 'description']
@@ -348,28 +350,46 @@ class TaskViewSet(viewsets.ModelViewSet):
         if getattr(self, 'swagger_fake_view', False):
             return Task.objects.none()
             
-        # Check if this is a direct route or a nested route
-        column_id = self.kwargs.get('column_pk')
-        task_id = self.kwargs.get('pk') or self.kwargs.get('task_id')
-        
-        # If we have a specific task ID and no column ID, return just that task
-        if task_id and not column_id:
-            return Task.objects.filter(id=task_id)
-        
-        # If we have a column ID, filter by column
-        if column_id:
-            return Task.objects.filter(column_id=column_id)
+        # Handle case where kwargs is not set (during routing inspection)
+        # This is critical for Django REST Framework router registration
+        if not hasattr(self, 'kwargs'):
+            return self.queryset
             
-        # Default case: return all tasks the user has access to
-        # Get all projects the user is a member of
-        user_projects = Project.objects.filter(
-            members__user=self.request.user
-        )
-        
-        # Return all tasks in columns that belong to boards in those projects
-        return Task.objects.filter(
-            column__board__project__in=user_projects
-        )
+        # Handle case where request is not available (during introspection)
+        if not hasattr(self, 'request'):
+            return self.queryset
+            
+        # Safety check to prevent any attribute errors during routing
+        try:
+            # Check if this is a direct route or a nested route
+            column_id = self.kwargs.get('column_pk')
+            task_id = self.kwargs.get('pk') or self.kwargs.get('task_id')
+            
+            # If we have a specific task ID and no column ID, return just that task
+            if task_id and not column_id:
+                return Task.objects.filter(id=task_id)
+            
+            # If we have a column ID, filter by column
+            if column_id:
+                return Task.objects.filter(column_id=column_id)
+                
+            # Default case: return all tasks the user has access to
+            # Get all projects the user is a member of
+            if hasattr(self.request, 'user') and self.request.user.is_authenticated:
+                user_projects = Project.objects.filter(
+                    members__user=self.request.user
+                )
+                
+                # Return all tasks in columns that belong to boards in those projects
+                return Task.objects.filter(
+                    column__board__project__in=user_projects
+                )
+            else:
+                # Fallback for unauthenticated requests
+                return self.queryset
+        except (AttributeError, KeyError, TypeError):
+            # Catch any unexpected errors during routing inspection
+            return self.queryset
     
     def get_serializer_class(self):
         if self.action == 'retrieve':
@@ -393,10 +413,10 @@ class TaskViewSet(viewsets.ModelViewSet):
         
         # Direct route case - column should be provided in the request data
         if not column_id:
-            column_id = serializer.validated_data.get('column')
-            if not column_id:
+            column = serializer.validated_data.get('column')
+            if not column:
                 raise serializers.ValidationError({"column": "Column ID is required"})
-            column = get_object_or_404(Column, id=column_id)
+            # column is already a Column object from PrimaryKeyRelatedField
         else:
             # Nested route case
             column = get_object_or_404(Column, id=column_id)

@@ -300,13 +300,23 @@ SIMPLE_JWT = {
     'JTI_CLAIM': 'jti',
 }
 
+# Custom JWT settings for remember_me functionality
+# These settings define extended token lifetimes when remember_me is True
+SIMPLE_JWT_REMEMBER_ACCESS_TOKEN_LIFETIME = timedelta(hours=int(os.environ.get('JWT_REMEMBER_ACCESS_TOKEN_LIFETIME_HOURS', 24)))
+SIMPLE_JWT_REMEMBER_REFRESH_TOKEN_LIFETIME = timedelta(days=int(os.environ.get('JWT_REMEMBER_REFRESH_TOKEN_LIFETIME_DAYS', 30)))
+
 # Djoser settings
 DJOSER = {
     'PASSWORD_RESET_CONFIRM_URL': 'password/reset/confirm/{uid}/{token}',
     'USERNAME_RESET_CONFIRM_URL': 'username/reset/confirm/{uid}/{token}',
     'ACTIVATION_URL': 'activate/{uid}/{token}',
     'SEND_ACTIVATION_EMAIL': True,
-    'SERIALIZERS': {},
+    'SERIALIZERS': {
+        'user_create': 'users.serializers.UserCreateSerializer',
+        'user_create_password_retype': 'users.serializers.UserCreateSerializer',
+        'user': 'users.serializers.UserSerializer',
+        'current_user': 'users.serializers.UserDetailSerializer',
+    },
     'EMAIL': {
         'password_reset': 'users.email.PasswordResetEmail',
         'activation': 'users.email.ActivationEmail',

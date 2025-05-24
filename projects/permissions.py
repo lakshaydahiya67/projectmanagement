@@ -21,7 +21,20 @@ class IsProjectMember(permissions.BasePermission):
                 except Column.DoesNotExist:
                     return False
             else:
-                return False
+                # For task creation via /api/v1/tasks/, get project from column in request data
+                if hasattr(request, 'data') and 'column' in request.data:
+                    column_id = request.data.get('column')
+                    if column_id:
+                        from projects.models import Column
+                        try:
+                            column = Column.objects.get(id=column_id)
+                            project_id = column.board.project_id
+                        except Column.DoesNotExist:
+                            return False
+                    else:
+                        return False
+                else:
+                    return False
                 
         # Check if project is public
         try:
@@ -85,7 +98,20 @@ class IsProjectAdmin(permissions.BasePermission):
                 except Column.DoesNotExist:
                     return False
             else:
-                return False
+                # For task creation via /api/v1/tasks/, get project from column in request data
+                if hasattr(request, 'data') and 'column' in request.data:
+                    column_id = request.data.get('column')
+                    if column_id:
+                        from projects.models import Column
+                        try:
+                            column = Column.objects.get(id=column_id)
+                            project_id = column.board.project_id
+                        except Column.DoesNotExist:
+                            return False
+                    else:
+                        return False
+                else:
+                    return False
         
         membership = ProjectMember.objects.filter(
             project_id=project_id,

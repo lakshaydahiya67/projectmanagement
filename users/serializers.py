@@ -2,8 +2,14 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from djoser.serializers import UserCreatePasswordRetypeSerializer as BaseUserCreateSerializer
 from .models import UserPreference
 import re
+import logging
+import sys
+
+# Set up logging for debugging
+logger = logging.getLogger('users.serializers')
 
 User = get_user_model()
 
@@ -27,15 +33,24 @@ class UserDetailSerializer(UserSerializer):
     class Meta(UserSerializer.Meta):
         fields = UserSerializer.Meta.fields + ['is_active', 'last_login']
 
-class UserCreateSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
-    password_confirm = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
+class UserCreateSerializer(BaseUserCreateSerializer):
+    # No need to declare password and re_password again - they're inherited from BaseUserCreateSerializer
     
-    class Meta:
+    class Meta(BaseUserCreateSerializer.Meta):
         model = User
-        fields = ['username', 'email', 'password', 'password_confirm', 
-                  'first_name', 'last_name', 'profile_picture', 'phone_number', 
-                  'job_title', 'bio']
+        fields = BaseUserCreateSerializer.Meta.fields + (
+            'first_name', 'last_name', 'profile_picture', 'phone_number', 
+            'job_title', 'bio'
+        )
+    
+    def __init__(self, *args, **kwargs):
+        print(f"DEBUG: UserCreateSerializer.__init__() called", flush=True)
+        sys.stdout.flush()
+        logger.critical(f"UserCreateSerializer.__init__() called")
+        super().__init__(*args, **kwargs)
+        print(f"DEBUG: UserCreateSerializer fields: {list(self.fields.keys())}", flush=True)
+        sys.stdout.flush()
+        logger.critical(f"UserCreateSerializer fields: {list(self.fields.keys())}")
     
     def validate_email(self, value):
         """Validate email is unique"""
@@ -45,6 +60,9 @@ class UserCreateSerializer(serializers.ModelSerializer):
     
     def validate_password(self, value):
         """Validate password complexity"""
+        print(f"DEBUG: UserCreateSerializer.validate_password() called with: {value}", flush=True)
+        sys.stdout.flush()
+        logger.critical(f"UserCreateSerializer.validate_password() called with: {value}")
         try:
             # Use Django's built-in password validation
             validate_password(value)
@@ -67,15 +85,25 @@ class UserCreateSerializer(serializers.ModelSerializer):
         return value
     
     def validate(self, attrs):
-        if attrs['password'] != attrs.pop('password_confirm'):
-            raise serializers.ValidationError({"password_confirm": "Password fields didn't match."})
+        print(f"DEBUG: UserCreateSerializer.validate() called with attrs: {attrs}", flush=True)
+        sys.stdout.flush()
+        logger.critical(f"UserCreateSerializer.validate() called with attrs: {attrs}")
+        # Let the parent class handle password validation
+        attrs = super().validate(attrs)
+        print(f"DEBUG: After parent validation, attrs: {attrs}", flush=True)
+        sys.stdout.flush()
+        logger.critical(f"After parent validation, attrs: {attrs}")
         return attrs
     
     def create(self, validated_data):
-        password = validated_data.pop('password')
-        user = User(**validated_data)
-        user.set_password(password)
-        user.save()
+        print(f"DEBUG: UserCreateSerializer.create() called with validated_data: {validated_data}", flush=True)
+        sys.stdout.flush()
+        logger.critical(f"UserCreateSerializer.create() called with validated_data: {validated_data}")
+        # Let the parent Djoser serializer handle the creation
+        user = super().create(validated_data)
+        print(f"DEBUG: User created: {user.username}, first_name: '{user.first_name}', last_name: '{user.last_name}'", flush=True)
+        sys.stdout.flush()
+        logger.critical(f"User created: {user.username}, first_name: '{user.first_name}', last_name: '{user.last_name}'")
         
         # UserPreference will be created via signal handler
         
@@ -83,11 +111,25 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
 class UserUpdateSerializer(serializers.ModelSerializer):
     profile_picture = serializers.ImageField(required=False, allow_null=True)
+    first_name = serializers.CharField(required=True, max_length=150, allow_blank=False)
+    last_name = serializers.CharField(required=True, max_length=150, allow_blank=False)
     
     class Meta:
         model = User
         fields = ['first_name', 'last_name', 'profile_picture', 'phone_number', 
                   'job_title', 'bio']
+    
+    def validate_first_name(self, value):
+        """Ensure first name is not empty or just whitespace"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("First name cannot be empty.")
+        return value.strip()
+    
+    def validate_last_name(self, value):
+        """Ensure last name is not empty or just whitespace"""
+        if not value or not value.strip():
+            raise serializers.ValidationError("Last name cannot be empty.")
+        return value.strip()
     
     def update(self, instance, validated_data):
         # Handle profile picture update separately

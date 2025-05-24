@@ -69,6 +69,15 @@ def dashboard_view(request):
     return render(request, 'dashboard/dashboard.html', context)
 
 
+@jwt_login_required
+def profile_view(request):
+    """
+    View function for rendering the user profile page
+    """
+    # The @jwt_login_required decorator ensures request.user is available
+    return render(request, 'user/profile.html', {'user': request.user})
+
+
 @ensure_csrf_cookie
 def activation_view(request, uid, token):
     """

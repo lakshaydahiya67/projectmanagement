@@ -228,72 +228,60 @@ class PasswordResetEmail(email.PasswordResetEmail):
             # Add required context variables
             context['uid'] = urlsafe_base64_encode(force_bytes(user.pk))
             context['token'] = default_token_generator.make_token(user)
-            print(f"[ULTRA-DEBUG] Generated uid: {context['uid']} and token: {context['token']}")
             
             # Ensure domain is properly formatted without protocol
             domain = context.get('domain', '')
-            print(f"[ULTRA-DEBUG] Original domain from context: '{domain}'")
-            logger.critical(f"Original domain from context: '{domain}'")
+            logger.debug(f"Original domain from context: '{domain}'")
             
             # Fix: Handle comma-separated domain list by taking only the first domain
             if ',' in domain:
                 # Split by comma and take the first domain
                 domain = domain.split(',')[0].strip()
-                print(f"[ULTRA-DEBUG] Multiple domains detected, using first domain: '{domain}'")
-                logger.critical(f"Multiple domains detected, using first domain: '{domain}'")
+                logger.debug(f"Multiple domains detected, using first domain: '{domain}'")
             
             # If we're running locally on port 8000, ensure the port is included
             if domain == 'localhost' and os.environ.get('PORT', '8000') != '80':
                 domain = f"localhost:{os.environ.get('PORT', '8000')}"
                 context['domain'] = domain
-                print(f"[ULTRA-DEBUG] Updated domain with port: '{domain}'")
-                logger.critical(f"Updated domain with port: '{domain}'")
+                logger.debug(f"Updated domain with port: '{domain}'")
                 
             # Format the URL with uid and token
             url_template = django_settings.DJOSER.get('PASSWORD_RESET_CONFIRM_URL')
-            print(f"[ULTRA-DEBUG] URL template from settings: '{url_template}'")
-            logger.critical(f"URL template from settings: '{url_template}'")
+            logger.debug(f"URL template from settings: '{url_template}'")
             
             formatted_url = url_template.format(uid=context['uid'], token=context['token'])
-            print(f"[ULTRA-DEBUG] Formatted URL: '{formatted_url}'")
-            logger.critical(f"Formatted URL: '{formatted_url}'")
+            logger.debug(f"Formatted URL: '{formatted_url}'")
             
             # Create the complete reset URL
             context['url'] = formatted_url  # This is used by the parent class
             
             protocol = context.get('protocol', 'http')
-            print(f"[ULTRA-DEBUG] Protocol: '{protocol}'")
-            logger.critical(f"Protocol: '{protocol}'")
+            logger.debug(f"Protocol: '{protocol}'")
             
             # Force HTTP for localhost
             if domain == 'localhost' or '127.0.0.1' in domain:
                 protocol = 'http'
-                print(f"[ULTRA-DEBUG] Forced protocol to HTTP for localhost")
-                logger.critical(f"Forced protocol to HTTP for localhost")
+                logger.debug(f"Forced protocol to HTTP for localhost")
             
             context['reset_url'] = '{protocol}://{domain}/{url}'.format(
                 protocol=protocol,
                 domain=domain,
                 url=formatted_url
             )
-            print(f"[ULTRA-DEBUG] Complete reset URL: '{context['reset_url']}'")
-            logger.critical(f"Complete reset URL: '{context['reset_url']}'")
+            logger.debug(f"Complete reset URL: '{context['reset_url']}'")
             
             # Add user's full name for personalization
             context['full_name'] = user.get_full_name() or user.username
-            print(f"[ULTRA-DEBUG] User full name: '{context['full_name']}'")
-            logger.critical(f"User full name: '{context['full_name']}'")
+            logger.debug(f"User full name: '{context['full_name']}'")
             
             # Add site_name to context if not present
             if 'site_name' not in context:
                 context['site_name'] = django_settings.DJOSER.get('SITE_NAME', 'Project Management')
-                print(f"[ULTRA-DEBUG] Added site_name to context: {context['site_name']}")
-                logger.critical(f"Added site_name to context: {context['site_name']}")
+                logger.debug(f"Added site_name to context: {context['site_name']}")
             
             return context
         except Exception as e:
-            print(f"[ULTRA-DEBUG] Error in get_context_data: {str(e)}")
-            logger.critical(f"Error in get_context_data: {str(e)}")
+            logger.error(f"Error in get_context_data: {str(e)}")
             logger.exception("Exception details:")
             return context
         

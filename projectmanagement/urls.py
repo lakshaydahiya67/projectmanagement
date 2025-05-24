@@ -19,6 +19,7 @@ from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import JsonResponse
+from django.shortcuts import redirect
 from django.db import connections
 from django.db.utils import OperationalError
 from django.views.generic import TemplateView
@@ -32,7 +33,7 @@ from organizations.views import organization_detail_view, organization_list_view
 from projects.views import project_detail_view, board_detail_view, project_delete_view, project_create_view
 from projects.views_edit import project_update_view
 from tasks.views import task_detail_view, task_create_view, task_update_view
-from .views import dashboard_view, activation_view, logout_view, complete_logout, serve_service_worker
+from .views import dashboard_view, activation_view, logout_view, complete_logout, serve_service_worker, profile_view
 
 def health_check(request):
     """Health check endpoint for Docker that verifies database and Redis connections"""
@@ -78,7 +79,7 @@ schema_view = get_schema_view(
 api_patterns = [
     # Authentication endpoints
     path('auth/', include('djoser.urls')),
-    path('auth/', include('djoser.urls.jwt')),  # Includes endpoints for JWT create, refresh, verify, and blacklist
+    path('auth/jwt/', include('users.jwt_urls')),  # Custom JWT endpoints with remember_me support
     path('auth/token/logout/', logout_view, name='token_logout'),  # Custom logout handler
     path('auth/complete-logout/', complete_logout, name='complete_logout'),  # Final logout step handler
     
@@ -122,7 +123,7 @@ urlpatterns = [
     path('organizations/<uuid:org_id>/update/', organization_update_view, name='organization_update'),
     path('organizations/<uuid:org_id>/projects/create/', project_create_view, name='project_create'),
     path('organizations/<uuid:org_id>/delete/', organization_delete_view, name='organization_delete'),
-    path('profile/', TemplateView.as_view(template_name='user/profile.html'), name='profile'),
+    path('profile/', profile_view, name='profile'),
     path('accounts/logout/', LogoutView.as_view(next_page='login'), name='django_logout'),  # Django's built-in logout (not used for API)
     path('logout/', lambda request: redirect('login'), name='logout'),  # Redirect to login page (client-side logout handles JWT invalidation)
     path('activate/<str:uid>/<str:token>/', activation_view, name='activation'),
