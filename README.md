@@ -66,7 +66,7 @@ This project's documentation is organized into the following sections:
    ```
 
 5. **Build Commands**:
-   - `chmod +x ./render-build.sh && ./render-build.sh`
+   - `chmod +x ./build.sh && ./build.sh build`
 
 6. **Start Commands**:
    - `gunicorn projectmanagement.wsgi:application --log-file -`

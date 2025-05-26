@@ -3,9 +3,8 @@ services:
     name: projectmanagement
     env: python
     plan: free
-    buildCommand: chmod +x ./build.sh ./superuser.sh && ./build.sh build
-    startCommand: |
-      ./superuser.sh && ./build.sh django
+    buildCommand: chmod +x ./build.sh && ./build.sh build
+    startCommand: ./build.sh django
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.12
@@ -34,3 +33,18 @@ services:
         value: "True"
       - key: SECURE_HSTS_SECONDS
         value: "31536000"
+      # Email configuration for sending organization invitations
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.smtp.EmailBackend
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_USE_TLS
+        value: "True"
+      - key: EMAIL_HOST_USER
+        sync: false  # Set this to your Gmail address in Render dashboard
+      - key: EMAIL_HOST_PASSWORD
+        sync: false  # Set this to your Gmail app password in Render dashboard
+      - key: DEFAULT_FROM_EMAIL
+        value: admin@example.com

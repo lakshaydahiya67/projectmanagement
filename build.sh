@@ -42,7 +42,20 @@ setup_environment() {
     # Source the .env file if it exists
     if [ -f .env ]; then
         echo -e "${GREEN}Loading environment variables...${NC}"
-        export $(grep -v '^#' .env | xargs)
+        # Use a more robust method to load environment variables
+        # Strip inline comments and export valid environment variables
+        while IFS= read -r line; do
+            # Skip empty lines and comments
+            [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+            # Remove inline comments and trim whitespace
+            line=$(echo "$line" | sed 's/#.*$//' | sed 's/[[:space:]]*$//')
+            # Skip if line is empty after processing
+            [[ -z "$line" ]] && continue
+            # Export the variable if it has valid format
+            if [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+                export "$line"
+            fi
+        done < .env
     fi
     
     return 0
