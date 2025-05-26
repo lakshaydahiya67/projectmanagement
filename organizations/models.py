@@ -72,10 +72,12 @@ class OrganizationInvitation(models.Model):
         return timezone.now() > self.expires_at
         
     def save(self, *args, **kwargs):
-        if not self.token:
+        # Always generate a new token when creating a new invitation
+        if not self.pk or not self.token:
             # Generate a secure token
             self.token = secrets.token_urlsafe(32)
             
+        # Always set expiration to 7 days from now if not set
         if not self.expires_at:
             # Set expiration to 7 days from now
             self.expires_at = timezone.now() + timezone.timedelta(days=7)

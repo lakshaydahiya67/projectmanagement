@@ -1,19 +1,19 @@
-# Core dependencies
-Django==4.2.11
-asgiref==3.7.2
-sqlparse==0.4.4
+# Core dependencies - Updated for security
+Django==5.0.8  # Updated from 4.2.11 for security fixes
+asgiref==3.8.1  # Updated for compatibility
+sqlparse==0.5.1  # Updated for security
 python-dotenv==1.0.1
 
 # WSGI Server
-gunicorn==21.2.0
-whitenoise==6.6.0  # For serving static files
+gunicorn==22.0.0  # Updated for security
+whitenoise==6.7.0  # Updated for serving static files
 
 # API Framework
-djangorestframework>=3.15.0
-django-cors-headers==4.3.1
-djoser==2.2.2
+djangorestframework>=3.15.2  # Updated for security
+django-cors-headers==4.4.0  # Updated
+djoser==2.2.3  # Updated
 djangorestframework-simplejwt==5.3.0
-django-filter==23.5
+django-filter==24.3  # Updated
 drf-yasg==1.21.7
 drf-nested-routers==0.94.2
 
@@ -22,31 +22,28 @@ python-jose==3.3.0  # For JWT support
 python-jose[cryptography]
 
 # WebSockets
-channels==4.0.0
-daphne==4.0.0
-channels-redis==4.1.0
-
-# Task Queue
-celery==5.3.6
-redis==5.0.1
+channels==4.1.0  # Updated
+daphne==4.1.2  # Updated
+# channels-redis removed (using in-memory channel layer instead)
 
 # File handling
-Pillow==10.1.0
+Pillow==10.4.0  # CRITICAL: Updated from 10.1.0 for security vulnerabilities
 
 # Security
 python-decouple==3.8  # For environment variable handling
+python-magic==0.4.27  # Added for MIME type validation
 
 # Email
 sendgrid==6.11.0  # For sending emails
 
 # Monitoring
-sentry-sdk==1.40.0  # For error tracking
+sentry-sdk==2.14.0  # Updated for latest features
 
 # Caching
-django-redis==5.4.0
+# django-redis removed (using Django's default cache)
 
 # Performance
-uvicorn==0.24.0  # ASGI server
+uvicorn==0.30.6  # Updated ASGI server
 
 # Development (kept for compatibility)
 # channels-daphne==4.0.0

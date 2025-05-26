@@ -1,24 +1,6 @@
 version: '3.8'
 
 services:
-  # Redis service for caching, WebSockets and Celery
-  redis:
-    image: redis:7-alpine
-    container_name: redis
-    restart: unless-stopped
-    # Only expose Redis to other containers, not to the host
-    expose:
-      - "6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - app_network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    command: ["redis-server", "--appendonly", "yes"]
 
   # Django application
   django:
@@ -32,17 +14,10 @@ services:
       - static_data:/app/staticfiles
       - media_data:/app/media
     entrypoint: ["/app/build.sh", "docker"]
-    depends_on:
-      redis:
-        condition: service_healthy
     env_file:
       - .env
     # Add environment variables not in .env file
     environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - DJANGO_SETTINGS_MODULE=projectmanagement.settings
       - DATABASE_PATH=/data/db.sqlite3
       # Superuser credentials for first run (only used if superuser doesn't exist)
@@ -60,77 +35,13 @@ services:
           cpus: '0.5'
           memory: 512M
 
-  # Celery worker
-  celery_worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: celery_worker
-    restart: unless-stopped
-    volumes:
-      - sqlite_data:/data
-      - media_data:/app/media
-    entrypoint: ["/app/build.sh", "celery"]
-    depends_on:
-      django:
-        condition: service_started
-      redis:
-        condition: service_healthy
-    env_file:
-      - .env
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - DJANGO_SETTINGS_MODULE=projectmanagement.settings
-      - DATABASE_PATH=/data/db.sqlite3
-    networks:
-      - app_network
-    deploy:
-      resources:
-        limits:
-          cpus: '0.3'
-          memory: 512M
 
-  # Celery beat for scheduled tasks
-  celery_beat:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: celery_beat
-    restart: unless-stopped
-    volumes:
-      - sqlite_data:/data
-    entrypoint: ["/app/build.sh", "celerybeat"]
-    depends_on:
-      django:
-        condition: service_started
-      redis:
-        condition: service_healthy
-    env_file:
-      - .env
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - DJANGO_SETTINGS_MODULE=projectmanagement.settings
-      - DATABASE_PATH=/data/db.sqlite3
-    networks:
-      - app_network
-    deploy:
-      resources:
-        limits:
-          cpus: '0.1'
-          memory: 128M
 
 networks:
   app_network:
     driver: bridge
 
 volumes:
-  redis_data:
   sqlite_data:
   static_data:
   media_data:

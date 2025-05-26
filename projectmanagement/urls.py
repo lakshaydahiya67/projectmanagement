@@ -27,16 +27,20 @@ from django.contrib.auth.views import LogoutView
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
-import redis
+# redis import removed
 import os
-from organizations.views import organization_detail_view, organization_list_view, organization_update_view, organization_delete_view
+from organizations.views import (
+    organization_detail_view, organization_list_view, 
+    organization_update_view, organization_delete_view,
+    accept_invitation_view
+)
 from projects.views import project_detail_view, board_detail_view, project_delete_view, project_create_view
 from projects.views_edit import project_update_view
 from tasks.views import task_detail_view, task_create_view, task_update_view
 from .views import dashboard_view, activation_view, logout_view, complete_logout, serve_service_worker, profile_view
 
 def health_check(request):
-    """Health check endpoint for Docker that verifies database and Redis connections"""
+    """Health check endpoint for Docker that verifies database connection"""
     status = {"status": "ok", "services": {}}
     
     # Check database connection
@@ -46,17 +50,6 @@ def health_check(request):
         status["services"]["database"] = "up"
     except OperationalError:
         status["services"]["database"] = "down"
-        status["status"] = "degraded"
-    
-    # Check Redis connection if used
-    try:
-        redis_host = os.environ.get('REDIS_HOST', '127.0.0.1')
-        redis_port = int(os.environ.get('REDIS_PORT', 6379))
-        r = redis.Redis(host=redis_host, port=redis_port, socket_connect_timeout=2)
-        r.ping()
-        status["services"]["redis"] = "up"
-    except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError):
-        status["services"]["redis"] = "down"
         status["status"] = "degraded"
     
     return JsonResponse(status)
@@ -123,6 +116,7 @@ urlpatterns = [
     path('organizations/<uuid:org_id>/update/', organization_update_view, name='organization_update'),
     path('organizations/<uuid:org_id>/projects/create/', project_create_view, name='project_create'),
     path('organizations/<uuid:org_id>/delete/', organization_delete_view, name='organization_delete'),
+    path('organizations/<uuid:org_id>/accept/<str:token>/', accept_invitation_view, name='accept_invitation'),
     path('profile/', profile_view, name='profile'),
     path('accounts/logout/', LogoutView.as_view(next_page='login'), name='django_logout'),  # Django's built-in logout (not used for API)
     path('logout/', lambda request: redirect('login'), name='logout'),  # Redirect to login page (client-side logout handles JWT invalidation)

@@ -107,7 +107,10 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         )
         invitation.save()  # This will generate the token and set expires_at
         
-        # TODO: Send email invitation
+        # Explicitly send the invitation email here to ensure it's sent immediately
+        # (the signal handler will also try to send it but this is a backup)
+        from .email import send_invitation_email
+        send_invitation_email(invitation)
         
         serializer = OrganizationInvitationSerializer(invitation)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -143,6 +146,40 @@ class OrganizationInvitationViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         organization_id = self.kwargs.get('organization_pk')
         return OrganizationInvitation.objects.filter(organization_id=organization_id)
+    
+    def perform_create(self, serializer):
+        """Set the organization and invited_by fields when creating an invitation"""
+        organization_id = self.kwargs.get('organization_pk')
+        organization = get_object_or_404(Organization, id=organization_id)
+        
+        # Check if email is provided and user is not already a member
+        email = serializer.validated_data.get('email')
+        if not email:
+            raise serializers.ValidationError({"email": "Email is required"})
+            
+        # Check if user is already a member
+        if OrganizationMember.objects.filter(
+            organization=organization,
+            user__email=email
+        ).exists():
+            raise serializers.ValidationError({"email": "User is already a member of this organization"})
+            
+        # Check for existing active invitation
+        existing_invitation = OrganizationInvitation.objects.filter(
+            organization=organization,
+            email=email,
+            accepted=False,
+            expires_at__gt=timezone.now()
+        ).first()
+        
+        if existing_invitation:
+            return existing_invitation
+            
+        # Save the new invitation with required fields
+        serializer.save(
+            organization=organization,
+            invited_by=self.request.user
+        )
     
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def accept(self, request, pk=None, organization_pk=None):
@@ -198,10 +235,52 @@ class OrganizationInvitationViewSet(viewsets.ModelViewSet):
         invitation.expires_at = timezone.now() + datetime.timedelta(days=7)
         invitation.save(update_fields=['expires_at'])
         
-        # TODO: Resend email invitation
+        # Send invitation email
+        from .email import send_invitation_email
+        send_invitation_email(invitation)
         
         serializer = self.get_serializer(invitation)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def accept_by_token(self, request, organization_pk=None, token=None):
+        """Accept an invitation using a token from the URL"""
+        organization = get_object_or_404(Organization, id=organization_pk)
+        
+        # Find the invitation by token
+        invitation = get_object_or_404(
+            OrganizationInvitation,
+            organization=organization,
+            token=token,
+            accepted=False
+        )
+        
+        # Check if invitation is valid
+        if invitation.is_expired:
+            return Response(
+                {"detail": "Invitation has expired."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if email matches the current user
+        if invitation.email != request.user.email:
+            return Response(
+                {"detail": "This invitation is for a different email address."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create organization membership
+        OrganizationMember.objects.create(
+            user=request.user,
+            organization=invitation.organization,
+            role=invitation.role
+        )
+        
+        # Mark invitation as accepted
+        invitation.accepted = True
+        invitation.save(update_fields=['accepted'])
+        
+        return Response({"detail": "Successfully joined the organization."})
 
 # View for rendering the organization detail HTML page
 def organization_detail_view(request, org_id):
@@ -214,6 +293,46 @@ def organization_detail_view(request, org_id):
     
     return render(request, 'organization/detail.html', {'organization': organization})
 
+
+# View for accepting invitations from email links
+def accept_invitation_view(request, org_id, token):
+    """Handle invitation acceptance from email links"""
+    organization = get_object_or_404(Organization, id=org_id)
+    
+    # If the user is not authenticated, redirect to login
+    if not request.user.is_authenticated:
+        next_url = f"/organizations/{org_id}/accept/{token}/"
+        return redirect(f"/login/?next={next_url}")
+    
+    # Find the invitation by token
+    invitation = get_object_or_404(
+        OrganizationInvitation,
+        organization=organization,
+        token=token,
+        accepted=False
+    )
+    
+    # Check if invitation is expired
+    if invitation.is_expired:
+        return render(
+            request, 
+            'organization/accept_invitation.html',
+            {'error': 'This invitation has expired.', 'organization': organization}
+        )
+        
+    # Check if the email matches
+    if invitation.email != request.user.email:
+        return render(
+            request, 
+            'organization/accept_invitation.html',
+            {'error': 'This invitation was sent to a different email address.', 'organization': organization}
+        )
+    
+    # Just render the template. The actual acceptance will be handled via the API
+    return render(request, 'organization/accept_invitation.html', {
+        'invitation': invitation,
+        'organization': organization
+    })
 
 # View for updating an organization
 def organization_update_view(request, org_id):

@@ -21,9 +21,6 @@ setup(
         "drf-nested-routers>=0.95.0",
         "channels>=4.0.0",
         "daphne>=4.0.0",
-        "channels-redis>=4.1.0",
-        "celery>=5.3.6",
-        "redis>=5.0.1",
         "Pillow>=10.1.0",
     ],
     classifiers=[

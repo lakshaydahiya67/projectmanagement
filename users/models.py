@@ -8,12 +8,60 @@ from django.conf import settings
 import os
 import uuid
 
-def validate_image_size(image):
-    """Validate that the image is not too large (max 5MB)"""
+# Optional import for enhanced MIME type validation
+try:
+    import magic
+    HAS_MAGIC = True
+except ImportError:
+    HAS_MAGIC = False
+
+def validate_image_file(image):
+    """Comprehensive image validation with security checks"""
+    # Size validation (max 2MB for better security)
     file_size = image.file.size
-    limit_mb = 5
+    limit_mb = 2
     if file_size > limit_mb * 1024 * 1024:
-        raise ValidationError(f"Max size of file is {limit_mb} MB")
+        raise ValidationError(f"File size too large. Maximum size is {limit_mb} MB")
+    
+    # Validate file extension
+    allowed_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+    ext = os.path.splitext(image.name)[1].lower()
+    if ext not in allowed_extensions:
+        raise ValidationError(f"Invalid file type. Allowed types: {', '.join(allowed_extensions)}")
+    
+    # MIME type validation using python-magic if available
+    if HAS_MAGIC:
+        try:
+            # Reset file pointer to beginning
+            image.file.seek(0)
+            file_data = image.file.read(1024)  # Read first 1KB for MIME detection
+            image.file.seek(0)  # Reset pointer
+            
+            mime_type = magic.from_buffer(file_data, mime=True)
+            allowed_mime_types = [
+                'image/jpeg', 'image/png', 'image/gif', 'image/webp'
+            ]
+            
+            if mime_type not in allowed_mime_types:
+                raise ValidationError(f"Invalid file content. Expected image file but got {mime_type}")
+                
+        except Exception:
+            # If magic fails, continue with basic validation
+            pass
+    
+    # Basic dimension check (max 4096x4096 to prevent memory exhaustion)
+    try:
+        from PIL import Image
+        image.file.seek(0)
+        with Image.open(image.file) as img:
+            width, height = img.size
+            max_dimension = 4096
+            if width > max_dimension or height > max_dimension:
+                raise ValidationError(f"Image dimensions too large. Maximum: {max_dimension}x{max_dimension}")
+        image.file.seek(0)  # Reset file pointer
+    except ImportError:
+        # PIL not available, skip dimension check
+        pass
 
 def user_profile_picture_path(instance, filename):
     """Generate a unique path for user profile pictures"""
@@ -29,7 +77,7 @@ class User(AbstractUser):
         upload_to=user_profile_picture_path, 
         null=True, 
         blank=True,
-        validators=[validate_image_size]
+        validators=[validate_image_file]
     )
     phone_number = models.CharField(
         max_length=15, 

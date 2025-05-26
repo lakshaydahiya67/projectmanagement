@@ -26,7 +26,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-j8l)e0!vcg6h*nbl0*qoo$@aox%8@64$&ykl=db9o4%q@y)t#b')
+# Generate a new secret key for production using: python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'k8h9j@#$%^&*()_+=-][{}|":?><,./;l][qwertyuiop[]asdfghjkl;zxcvbnm,.')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() == 'true'
@@ -116,6 +117,7 @@ INSTALLED_APPS += [
 ]
 
 MIDDLEWARE = [
+    'projectmanagement.security_middleware.SecurityMiddleware',  # Add security middleware first
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',  # Add CORS middleware before CommonMiddleware
@@ -180,8 +182,7 @@ else:
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
 
-# Custom password validation settings
-# Removed CommonPasswordValidator to allow more common passwords
+# SECURITY: Strong password validation for production security
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -189,13 +190,12 @@ AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
         'OPTIONS': {
-            'min_length': 6,  # Reduced from 8 to 6 for better usability
+            'min_length': 12,  # Increased to 12 for better security
         }
     },
-    # Removed CommonPasswordValidator to allow more common passwords like 'test1234'
-    # {
-    #     'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    # },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
     {
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
@@ -281,6 +281,7 @@ REST_FRAMEWORK = {
 JWT_ACCESS_TOKEN_LIFETIME_MINUTES = int(os.environ.get('JWT_ACCESS_TOKEN_LIFETIME_MINUTES', 60))
 JWT_REFRESH_TOKEN_LIFETIME_DAYS = int(os.environ.get('JWT_REFRESH_TOKEN_LIFETIME_DAYS', 7))
 
+# JWT Security Configuration - Hardened for production
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=JWT_ACCESS_TOKEN_LIFETIME_MINUTES),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=JWT_REFRESH_TOKEN_LIFETIME_DAYS),
@@ -298,6 +299,19 @@ SIMPLE_JWT = {
     'TOKEN_TYPE_CLAIM': 'token_type',
     'TOKEN_USER_CLASS': 'rest_framework_simplejwt.models.TokenUser',
     'JTI_CLAIM': 'jti',
+    
+    # Enhanced security settings
+    'TOKEN_OBTAIN_SERIALIZER': 'rest_framework_simplejwt.serializers.TokenObtainPairSerializer',
+    'TOKEN_REFRESH_SERIALIZER': 'rest_framework_simplejwt.serializers.TokenRefreshSerializer',
+    'TOKEN_VERIFY_SERIALIZER': 'rest_framework_simplejwt.serializers.TokenVerifySerializer',
+    'TOKEN_BLACKLIST_SERIALIZER': 'rest_framework_simplejwt.serializers.TokenBlacklistSerializer',
+    
+    # Security headers
+    'AUTH_COOKIE': None,  # Disable cookies for security
+    'AUTH_COOKIE_DOMAIN': None,
+    'AUTH_COOKIE_SECURE': not DEBUG,  # HTTPS only in production
+    'AUTH_COOKIE_HTTP_ONLY': True,  # Prevent XSS
+    'AUTH_COOKIE_SAMESITE': 'Lax',  # CSRF protection
 }
 
 # Custom JWT settings for remember_me functionality
@@ -332,10 +346,15 @@ DJOSER = {
     'USER_CREATE_PASSWORD_RETYPE': True,
 }
 
-# CORS settings
-CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost,http://127.0.0.1,https://*.onrender.com').split(',')
-CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', str(DEBUG)).lower() == 'true'
-CORS_ALLOW_CREDENTIALS = True
+# CORS settings - SECURITY CRITICAL: Never allow wildcard origins with credentials
+CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000,http://127.0.0.1:8000').split(',')
+
+# SECURITY FIX: Never allow all origins when credentials are enabled
+# This prevents CSRF attacks and credential theft
+CORS_ALLOW_ALL_ORIGINS = False  # Always False for security
+
+# Only allow credentials if we have specific origins configured
+CORS_ALLOW_CREDENTIALS = True and not CORS_ALLOW_ALL_ORIGINS
 CORS_PREFLIGHT_MAX_AGE = 86400  # 24 hours
 CORS_EXPOSE_HEADERS = ['Content-Type', 'X-CSRFToken']
 CORS_ALLOW_METHODS = [
@@ -364,16 +383,34 @@ USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+# Security headers - Enhanced for production security
+# Basic security settings that should always be enabled
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'
+
+# Production-specific security settings
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    SECURE_BROWSER_XSS_FILTER = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    X_FRAME_OPTIONS = 'DENY'
     SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+else:
+    # Development settings - less restrictive but still secure
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    # No HSTS in development
+    
+# Cookie security settings
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
 
 # Session configuration
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
@@ -385,20 +422,12 @@ SESSION_SAVE_EVERY_REQUEST = True
 ASGI_APPLICATION = 'projectmanagement.asgi.application'
 CHANNEL_LAYERS = {
     'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [(os.environ.get('REDIS_HOST', '127.0.0.1'), int(os.environ.get('REDIS_PORT', 6379)))],
-        },
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
     },
 }
 
-# Celery Settings
-CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL')
-CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND')
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = TIME_ZONE
+# Note: Celery and Redis dependencies have been removed from the project.
+# All async tasks are now executed synchronously.
 
 # Email settings
 EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
@@ -412,6 +441,12 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 # Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# File upload security settings
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024  # 2MB - keep small files in memory
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB - max total upload size in memory
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000  # Prevent DoS via too many form fields
+FILE_UPLOAD_PERMISSIONS = 0o644  # Read/write for owner, read for others
 
 # Configure logging
 LOGGING = {

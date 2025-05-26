@@ -11,9 +11,9 @@ try:
 except ImportError:
     ACTIVITY_LOGS_ENABLED = False
 
-# Try to import notification tasks if available
+# Try to import notification utilities if available
 try:
-    from notifications.tasks import send_task_assigned_notification, send_comment_notification
+    from notifications.utils import send_task_assigned_notification, send_comment_notification
     NOTIFICATIONS_ENABLED = True
 except ImportError:
     NOTIFICATIONS_ENABLED = False
@@ -46,9 +46,9 @@ def task_assignees_changed(sender, instance, action, pk_set, **kwargs):
                 user = User.objects.get(id=user_id)
                 assignee_names.append(user.get_full_name())
                 
-                # Send notification to each assignee
+                # Send notification to each assignee (synchronously)
                 if NOTIFICATIONS_ENABLED and assigned_by and user_id != assigned_by.id:
-                    send_task_assigned_notification.delay(
+                    send_task_assigned_notification(
                         task_id=str(instance.id),
                         user_id=user_id,
                         assigned_by_id=assigned_by.id
@@ -81,7 +81,7 @@ def comment_created_handler(sender, instance, created, **kwargs):
         
         # Send notification about the new comment
         if NOTIFICATIONS_ENABLED:
-            send_comment_notification.delay(instance.id)
+            send_comment_notification(instance.id)
 
 @receiver(post_save, sender=Attachment)
 def attachment_created_handler(sender, instance, created, **kwargs):

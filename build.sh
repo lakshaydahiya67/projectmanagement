@@ -222,7 +222,7 @@ main() {
         
         # Docker mode for container initialization
         "docker" | "django")
-            wait_for_service ${REDIS_HOST:-redis} ${REDIS_PORT:-6379}
+            # Redis wait removed (Redis no longer used)
             test_email_configuration
             setup_database "docker"
             collect_static_files "docker"
@@ -233,25 +233,7 @@ main() {
             fi
             ;;
         
-        # Celery worker mode
-        "celery")
-            wait_for_service ${REDIS_HOST:-redis} ${REDIS_PORT:-6379}
-            wait_for_service django 8000
-            echo -e "${GREEN}Starting Celery worker...${NC}"
-            exec celery -A projectmanagement worker \
-              --concurrency=4 \
-              --max-tasks-per-child=10 \
-              --max-memory-per-child=256000 \
-              --loglevel=info
-            ;;
-        
-        # Celery beat mode
-        "celerybeat")
-            wait_for_service ${REDIS_HOST:-redis} ${REDIS_PORT:-6379}
-            wait_for_service django 8000
-            echo -e "${GREEN}Starting Celery beat...${NC}"
-            exec celery -A projectmanagement beat --loglevel=info
-            ;;
+        # Celery worker and beat modes have been removed
         
         # Development mode
         "dev")
@@ -286,8 +268,7 @@ main() {
             echo "Modes:"
             echo "  build, render   - Build for Render.com deployment"
             echo "  docker, django  - Initialize and start Django in Docker"
-            echo "  celery          - Start Celery worker"
-            echo "  celerybeat      - Start Celery beat scheduler"
+            echo "  # Celery worker and beat modes have been removed"
             echo "  dev             - Run in development mode"
             echo "  staticfiles     - Collect and manage static files"
             echo "  env             - Setup environment only"

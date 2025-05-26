@@ -32,13 +32,8 @@ JWT_SIGNING_KEY=your-secure-jwt-signing-key-at-least-50-characters-long
 JWT_ACCESS_TOKEN_LIFETIME_MINUTES=60
 JWT_REFRESH_TOKEN_LIFETIME_DAYS=7
 
-# Redis Settings (for WebSockets and Celery)
-REDIS_HOST=redis
-REDIS_PORT=6379
-
-# Celery Settings
-CELERY_BROKER_URL=redis://redis:6379/0
-CELERY_RESULT_BACKEND=redis://redis:6379/0
+# Redis and Celery have been removed
+# WebSockets now use in-memory channel layer
 
 # Default Page Size for API Pagination
 DEFAULT_PAGE_SIZE=10

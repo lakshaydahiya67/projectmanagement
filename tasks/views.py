@@ -23,9 +23,9 @@ try:
 except ImportError:
     ACTIVITYLOG_AVAILABLE = False
 
-# Try to import notification tasks if available
+# Try to import notification utils if available
 try:
-    from notifications.tasks import send_task_assigned_notification, send_comment_notification
+    from notifications.utils import send_task_assigned_notification, send_comment_notification
     NOTIFICATIONS_AVAILABLE = True
 except ImportError:
     NOTIFICATIONS_AVAILABLE = False
@@ -81,6 +81,88 @@ class TaskViewSet(viewsets.ModelViewSet):
     ordering = ['order']
     throttle_classes = [UserRateThrottle]
     
+    def _check_task_permission(self, task, user, require_admin=False):
+        """
+        Helper method to check if a user has permission to access a task
+        Returns (project, is_member, is_admin, response_on_error)
+        If permission check passes, response_on_error will be None
+        If permission check fails, response_on_error will be a Response object
+        """
+        project = task.column.board.project
+        
+        # Check if user is project member
+        member = ProjectMember.objects.filter(
+            project=project,
+            user=user
+        ).first()
+        
+        is_member = member is not None
+        is_admin = is_member and member.role in ['admin', 'owner']
+        
+        if not is_member:
+            error_response = Response(
+                {"detail": "You do not have permission to access this task."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+            return project, is_member, is_admin, error_response
+            
+        if require_admin and not is_admin:
+            error_response = Response(
+                {"detail": "You must be a project admin to perform this action."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+            return project, is_member, is_admin, error_response
+            
+        return project, is_member, is_admin, None
+    
+    def get_queryset(self):
+        # Check if this is a schema generation request for Swagger
+        if getattr(self, 'swagger_fake_view', False):
+            return Task.objects.none()
+            
+        # Get project_pk from URL parameters
+        project_pk = self.kwargs.get('project_pk')
+        if project_pk:
+            # If we're accessing tasks for a specific project
+            return Task.objects.filter(
+                column__board__project_id=project_pk
+            ).select_related('column', 'column__board').prefetch_related('labels', 'assignees')
+        
+        # Get column_pk from URL parameters (for nested routes)
+        column_pk = self.kwargs.get('column_pk')
+        if column_pk:
+            # If we're accessing tasks for a specific column
+            return Task.objects.filter(
+                column_id=column_pk
+            ).select_related('column', 'column__board').prefetch_related('labels', 'assignees')
+            
+        # If no specific filters in URL, return tasks the user has access to
+        user = self.request.user
+        return Task.objects.filter(
+            column__board__project__members__user=user
+        ).select_related('column', 'column__board').prefetch_related('labels', 'assignees').distinct()
+        
+    def list(self, request, *args, **kwargs):
+        """
+        Override list method to handle pagination properly for frontend compatibility
+        When called from project detail view, we need to return a direct array for tasks.forEach
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # Check if pagination is explicitly requested
+        paginate = request.query_params.get('paginate', 'false').lower() == 'true'
+        
+        if paginate:
+            # Use normal pagination behavior
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+        
+        # Otherwise return direct array response for frontend compatibility
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
     @action(detail=False, methods=['post'], url_path=r'(?P<task_id>[^/.]+)/assign_task')
     def assign_task(self, request, column_pk=None, task_id=None):
         """
@@ -88,20 +170,10 @@ class TaskViewSet(viewsets.ModelViewSet):
         """
         task = get_object_or_404(Task, id=task_id, column_id=column_pk)
         
-        # Manually check if user has permission
-        project = task.column.board.project
-        
-        # Check if user is project member
-        is_member = ProjectMember.objects.filter(
-            project=project,
-            user=request.user
-        ).exists()
-        
-        if not is_member:
-            return Response(
-                {"detail": "You do not have permission to access this task."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        # Check permissions using helper method
+        project, is_member, is_admin, error_response = self._check_task_permission(task, request.user)
+        if error_response:
+            return error_response
         
         user_ids = request.data.get('user_ids', [])
         
@@ -144,20 +216,10 @@ class TaskViewSet(viewsets.ModelViewSet):
         """
         task = get_object_or_404(Task, id=task_id, column_id=column_pk)
         
-        # Manually check if user has permission
-        project = task.column.board.project
-        
-        # Check if user is project member
-        is_member = ProjectMember.objects.filter(
-            project=project,
-            user=request.user
-        ).exists()
-        
-        if not is_member:
-            return Response(
-                {"detail": "You do not have permission to access this task."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        # Check permissions using helper method
+        project, is_member, is_admin, error_response = self._check_task_permission(task, request.user)
+        if error_response:
+            return error_response
         
         label_ids = request.data.get('label_ids', [])
         
@@ -189,20 +251,10 @@ class TaskViewSet(viewsets.ModelViewSet):
         """
         task = get_object_or_404(Task, id=task_id, column_id=column_pk)
         
-        # Manually check if user has permission
-        project = task.column.board.project
-        
-        # Check if user is project member
-        is_member = ProjectMember.objects.filter(
-            project=project,
-            user=request.user
-        ).exists()
-        
-        if not is_member:
-            return Response(
-                {"detail": "You do not have permission to access this task."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        # Check permissions using helper method
+        project, is_member, is_admin, error_response = self._check_task_permission(task, request.user)
+        if error_response:
+            return error_response
         
         label_ids = request.data.get('label_ids', [])
         
@@ -241,20 +293,10 @@ class TaskViewSet(viewsets.ModelViewSet):
         """
         task = get_object_or_404(Task, id=task_id, column_id=column_pk)
         
-        # Manually check if user has permission
-        project = task.column.board.project
-        
-        # Check if user is project member
-        is_member = ProjectMember.objects.filter(
-            project=project,
-            user=request.user
-        ).exists()
-        
-        if not is_member:
-            return Response(
-                {"detail": "You do not have permission to access this task."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        # Check permissions using helper method
+        project, is_member, is_admin, error_response = self._check_task_permission(task, request.user)
+        if error_response:
+            return error_response
         
         serializer = TaskMoveSerializer(data=request.data)
         
@@ -359,7 +401,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         if not hasattr(self, 'request'):
             return self.queryset
             
-        # Safety check to prevent any attribute errors during routing
+        # Safety check to prevent any attribute errors during routing inspection
         try:
             # Check if this is a direct route or a nested route
             column_id = self.kwargs.get('column_pk')
@@ -660,7 +702,7 @@ class TaskViewSet(viewsets.ModelViewSet):
                 for user_id in valid_members:
                     # Only create notifications for newly assigned users
                     if user_id not in previous_assignees:
-                        send_task_assigned_notification.delay(
+                        send_task_assigned_notification(
                             task_id=task.id,
                             user_id=user_id,
                             assigned_by_id=request.user.id
@@ -907,7 +949,7 @@ class CommentViewSet(viewsets.ModelViewSet):
         
         # Send notification
         if NOTIFICATIONS_AVAILABLE:
-            send_comment_notification.delay(comment_id=comment.id)
+            send_comment_notification(comment_id=comment.id)
         
         # Send real-time WebSocket update
         channel_layer = get_channel_layer()

@@ -60,5 +60,14 @@ class OrganizationInvitationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'expires_at', 'accepted', 'invited_by', 'organization']
         extra_kwargs = {
-            'token': {'write_only': True}
+            'token': {'write_only': True, 'required': False}
         }
+    
+    def create(self, validated_data):
+        """
+        Override create method to ensure token is properly generated
+        """
+        # Token will be generated automatically in the model's save method
+        invitation = OrganizationInvitation(**validated_data)
+        invitation.save()
+        return invitation

@@ -15,4 +15,8 @@ urlpatterns = [
     path('', include(router.urls)),
     path('', include(organizations_router.urls)),
     path('<uuid:organization_id>/projects/', OrganizationProjectsView.as_view(), name='organization-projects'),
+    # Direct token acceptance endpoint for API use
+    path('<uuid:organization_id>/invitations/<str:token>/accept/', 
+         OrganizationInvitationViewSet.as_view({'post': 'accept_by_token'}), 
+         name='invitation-accept-by-token'),
 ]

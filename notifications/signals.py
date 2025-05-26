@@ -3,7 +3,7 @@ from django.dispatch import receiver
 from django.contrib.contenttypes.models import ContentType
 from tasks.models import Task, Comment
 from projects.models import ProjectMember
-from .tasks import (
+from .utils import (
     send_task_assigned_notification,
     send_comment_notification
 )
@@ -12,8 +12,8 @@ from .tasks import (
 def comment_created_notification(sender, instance, created, **kwargs):
     """Trigger notification when a new comment is created"""
     if created:
-        # Trigger async task to send notification
-        send_comment_notification.delay(instance.id)
+        # Send notification synchronously
+        send_comment_notification(instance.id)
 
 @receiver(m2m_changed, sender=Task.assignees.through)
 def task_assignee_changed(sender, instance, action, pk_set, **kwargs):
@@ -31,8 +31,8 @@ def task_assignee_changed(sender, instance, action, pk_set, **kwargs):
             if assigned_by and user_id == assigned_by.id:
                 continue
                 
-            # Trigger async task to send notification
-            send_task_assigned_notification.delay(
+            # Send notification synchronously
+            send_task_assigned_notification(
                 task_id=task.id,
                 user_id=user_id,
                 assigned_by_id=assigned_by.id if assigned_by else None
@@ -43,7 +43,7 @@ def project_member_added(sender, instance, created, **kwargs):
     """Trigger notification when a user is added to a project"""
     if created:
         from .models import Notification
-        from .tasks import send_realtime_notification
+        from .utils import send_realtime_notification
         
         # Create notification for the added user
         notification = Notification.objects.create(

@@ -43,7 +43,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='user',
             name='profile_picture',
-            field=models.ImageField(blank=True, null=True, upload_to='profile_pictures/', validators=[users.models.validate_image_size]),
+            field=models.ImageField(blank=True, null=True, upload_to='profile_pictures/', validators=[users.models.validate_image_file]),
         ),
         migrations.AlterField(
             model_name='userpreference',

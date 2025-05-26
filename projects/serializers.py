@@ -89,6 +89,14 @@ class BoardSerializer(serializers.ModelSerializer):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
+        # Check if we're in a nested context (creating board for a specific project)
+        view = self.context.get('view')
+        if view and hasattr(view, 'kwargs') and 'project_pk' in view.kwargs:
+            # In nested context, project comes from URL, so make it not required
+            self.fields['project'].required = False
+            self.fields['project'].allow_null = True
+        
         # Set project queryset based on user's accessible projects
         if self.context and 'request' in self.context:
             user = self.context['request'].user

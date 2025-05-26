@@ -97,6 +97,15 @@ class Board(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     is_default = models.BooleanField(default=False)
     
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['project'],
+                condition=models.Q(is_default=True),
+                name='one_default_board_per_project'
+            )
+        ]
+    
     def __str__(self):
         return f"{self.name} - {self.project.name}"
     
@@ -112,6 +121,16 @@ class Column(models.Model):
     
     class Meta:
         ordering = ['order']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(wip_limit__gt=0) | models.Q(wip_limit__isnull=True),
+                name='positive_wip_limit'
+            ),
+            models.UniqueConstraint(
+                fields=['board', 'name'],
+                name='unique_column_name_per_board'
+            )
+        ]
         
     def __str__(self):
         return f"{self.name} - {self.board.name}"

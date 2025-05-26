@@ -7,6 +7,63 @@ const LOGOUT_TIMESTAMP_KEY = 'logout_timestamp';
 const AUTH_TOKEN_KEY = 'auth_token';
 const MAX_LOGOUT_AGE = 5 * 60 * 1000; // 5 minutes in milliseconds
 
+// Endpoints that should NEVER have authentication headers automatically added
+// This prevents authentication bypass on login/registration endpoints
+// Updated to match actual API v1 endpoint patterns used in the Django application
+const AUTH_BYPASS_ENDPOINTS = [
+  // Djoser authentication endpoints (versioned API)
+  '/api/v1/auth/users/',                      // User registration
+  '/api/v1/auth/users/activation/',           // Account activation
+  '/api/v1/auth/users/resend_activation/',    // Resend activation
+  '/api/v1/auth/users/reset_password/',       // Password reset request
+  '/api/v1/auth/users/reset_password_confirm/', // Password reset confirm
+  '/api/v1/auth/users/set_password/',         // Set new password
+  '/api/v1/auth/users/set_username/',         // Set new username
+  
+  // Custom JWT endpoints (versioned API)
+  '/api/v1/auth/jwt/create/',                 // Login/JWT token creation
+  '/api/v1/auth/jwt/refresh/',                // Token refresh
+  '/api/v1/auth/jwt/verify/',                 // Token verification
+  '/api/v1/auth/jwt/blacklist/',              // Token blacklist
+  
+  // Public endpoints that bypass authentication
+  '/api/v1/public/password-reset/',           // Public password reset
+  
+  // Legacy patterns for backward compatibility
+  '/api/auth/users/',
+  '/api/auth/jwt/create/',
+  '/api/auth/jwt/refresh/',
+  '/api/auth/jwt/verify/',
+  '/api/auth/token/refresh/',
+  '/api/auth/token/verify/',
+  '/api/auth/password/reset/',
+  '/api/auth/password/reset/confirm/',
+  '/api/users/create/',
+  '/api/users/register/',
+  '/api/registration/',
+  '/api/login/',
+  '/api/logout/',
+  '/api/token/',
+  '/api/refresh-token/',
+  '/api/verify-token/'
+];
+
+// Function to check if a URL should bypass authentication injection
+function shouldBypassAuthInjection(url) {
+  try {
+    const urlObj = new URL(url);
+    const pathname = urlObj.pathname;
+    
+    return AUTH_BYPASS_ENDPOINTS.some(endpoint => {
+      // Exact match or starts with the endpoint path
+      return pathname === endpoint || pathname.startsWith(endpoint);
+    });
+  } catch (error) {
+    console.warn('Invalid URL for auth bypass check:', url);
+    return false;
+  }
+}
+
 // Install event - cache critical resources
 self.addEventListener('install', (event) => {
   console.log('Auth Service Worker installed');
@@ -161,6 +218,7 @@ self.addEventListener('fetch', (event) => {
           // Check if we should remove auth headers due to logout
           const shouldRemove = await shouldRemoveAuthHeader();
           
+          // Check if we should remove auth headers due to logout
           if (shouldRemove) {
             // Clone the request and remove the Authorization header
             const newRequest = new Request(request.url, {
@@ -177,35 +235,41 @@ self.addEventListener('fetch', (event) => {
             
             console.log('Auth Service Worker: Removed Authorization header from request to', request.url);
             return fetch(newRequest);
-          } else {
-            // Check if we need to add the auth token
-            // This is especially important for requests that might not have the token
-            const hasAuthHeader = request.headers.has('Authorization');
+          }
+          
+          // Check if this endpoint should bypass automatic auth injection
+          if (shouldBypassAuthInjection(request.url)) {
+            console.log('Auth Service Worker: Bypassing auth injection for', request.url);
+            return fetch(request);
+          }
+          
+          // Check if we need to add the auth token
+          // This is especially important for requests that might not have the token
+          const hasAuthHeader = request.headers.has('Authorization');
+          
+          if (!hasAuthHeader) {
+            // Try to get the stored token
+            const token = await getStoredAuthToken();
             
-            if (!hasAuthHeader) {
-              // Try to get the stored token
-              const token = await getStoredAuthToken();
+            if (token) {
+              // Clone the request and add the Authorization header
+              const newHeaders = new Headers(request.headers);
+              newHeaders.set('Authorization', `Bearer ${token}`);
               
-              if (token) {
-                // Clone the request and add the Authorization header
-                const newHeaders = new Headers(request.headers);
-                newHeaders.set('Authorization', `Bearer ${token}`);
-                
-                const newRequest = new Request(request.url, {
-                  method: request.method,
-                  headers: newHeaders,
-                  body: request.method !== 'GET' && request.method !== 'HEAD' ? await request.clone().arrayBuffer() : undefined,
-                  mode: request.mode,
-                  credentials: request.credentials,
-                  cache: request.cache,
-                  redirect: request.redirect,
-                  referrer: request.referrer,
-                  integrity: request.integrity
-                });
-                
-                console.log('Auth Service Worker: Added Authorization header to request to', request.url);
-                return fetch(newRequest);
-              }
+              const newRequest = new Request(request.url, {
+                method: request.method,
+                headers: newHeaders,
+                body: request.method !== 'GET' && request.method !== 'HEAD' ? await request.clone().arrayBuffer() : undefined,
+                mode: request.mode,
+                credentials: request.credentials,
+                cache: request.cache,
+                redirect: request.redirect,
+                referrer: request.referrer,
+                integrity: request.integrity
+              });
+              
+              console.log('Auth Service Worker: Added Authorization header to request to', request.url);
+              return fetch(newRequest);
             }
           }
           

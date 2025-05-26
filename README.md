@@ -29,11 +29,10 @@ This project's documentation is organized into the following sections:
 ## 🛠️ Tech Stack
 
 ### Backend
-- Django 4.2.11
+- Django 5.0.8
 - Django Templates for UI
-- Django REST Framework 3.14.0
-- Django Channels for WebSockets
-- Celery + Redis for background tasks
+- Django REST Framework 3.15.2
+- Django Channels for WebSockets (using in-memory channel layer)
 - JWT Authentication
 
 ## 🚀 Deployment on Render.com
@@ -60,8 +59,7 @@ This project's documentation is organized into the following sections:
 4. **Environment Variables for Application**:
    ```
    DATABASE_PATH=/opt/render/project/src/db.sqlite3
-   CELERY_BROKER_URL=redis://:password@host:port
-   CELERY_RESULT_BACKEND=redis://:password@host:port
+   # Celery and Redis are no longer used
    DJANGO_SETTINGS_MODULE=projectmanagement.settings
    DJANGO_SECRET_KEY=your-secret-key
    DJANGO_DEBUG=False
@@ -76,22 +74,17 @@ This project's documentation is organized into the following sections:
 ## 🏗️ Project Architecture
 
 ```
-┌────────────────┐     ┌────────────────┐
-│                │     │                │
-│  Django        │◄────┤  Celery        │
-│  Application   │     │  Workers       │
-│                │     │                │
-└────────────────┘     └────────────────┘
-        ▲                      ▲
-        │                      │
-        └──────────────────────┼──────────────────────┘
-                              │
-                     ┌────────────────┐
-                     │                │
-                     │  Redis         │
-                     │  (WS/Cache)    │
-                     │                │
-                     └────────────────┘
+┌────────────────┐     
+│                │     
+│  Django        │
+│  Application   │     
+│                │     
+└────────────────┘     
+        ▲                      
+        │                      
+        └── WebSockets with in-memory channel layer
+                              
+```
 ```
 
 For a detailed architecture overview, see the [Architecture Documentation](docs/ARCHITECTURE.md).

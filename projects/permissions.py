@@ -8,7 +8,7 @@ class IsProjectMember(permissions.BasePermission):
     """
     def has_permission(self, request, view):
         # Try to get project ID from various possible routes
-        project_id = view.kwargs.get('project_pk') or view.kwargs.get('pk')
+        project_id = view.kwargs.get('project_pk')
         
         # Handle nested routes through columns
         if not project_id:
@@ -34,6 +34,19 @@ class IsProjectMember(permissions.BasePermission):
                     else:
                         return False
                 else:
+                    # For direct task access like /api/v1/tasks/{id}/, defer to has_object_permission
+                    # This handles cases where we need to check permissions based on the task object
+                    if hasattr(view, 'action') and view.action in ['retrieve', 'update', 'partial_update', 'destroy']:
+                        return True  # Defer to has_object_permission
+                    
+                    # For task list action (/api/v1/tasks/), allow access - queryset filtering will handle security
+                    if hasattr(view, 'action') and view.action == 'list':
+                        return True  # Let the get_queryset method handle filtering
+                    
+                    # For task creation action (/api/v1/tasks/), check if column in request data above
+                    if hasattr(view, 'action') and view.action == 'create':
+                        return False  # No column provided in request data
+                    
                     return False
                 
         # Check if project is public
@@ -85,7 +98,7 @@ class IsProjectAdmin(permissions.BasePermission):
     """
     def has_permission(self, request, view):
         # Try to get project ID from various possible routes
-        project_id = view.kwargs.get('project_pk') or view.kwargs.get('pk')
+        project_id = view.kwargs.get('project_pk')
         
         # Handle nested routes through columns
         if not project_id:
@@ -111,6 +124,15 @@ class IsProjectAdmin(permissions.BasePermission):
                     else:
                         return False
                 else:
+                    # For direct task access like /api/v1/tasks/{id}/, defer to has_object_permission
+                    # This handles cases where we need to check permissions based on the task object
+                    if hasattr(view, 'action') and view.action in ['retrieve', 'update', 'partial_update', 'destroy']:
+                        return True  # Defer to has_object_permission
+                    
+                    # For task list action (/api/v1/tasks/), allow access - queryset filtering will handle security
+                    if hasattr(view, 'action') and view.action == 'list':
+                        return True  # Let the get_queryset method handle filtering
+                    
                     return False
         
         membership = ProjectMember.objects.filter(

@@ -21,16 +21,7 @@ services:
         generateValue: true
       - key: DATABASE_PATH
         value: /opt/render/project/src/db.sqlite3
-      - key: CELERY_BROKER_URL
-        fromService:
-          name: projectmanagement-redis
-          type: redis
-          property: connectionString
-      - key: CELERY_RESULT_BACKEND
-        fromService:
-          name: projectmanagement-redis
-          type: redis
-          property: connectionString
+      # Celery and Redis dependencies have been removed
       - key: ALLOWED_HOSTS
         value: projectmanagement-c23m.onrender.com,localhost,127.0.0.1,.onrender.com
       - key: DEBUG

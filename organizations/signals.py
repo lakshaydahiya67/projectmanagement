@@ -37,7 +37,12 @@ def organization_member_handler(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=OrganizationInvitation)
 def invitation_handler(sender, instance, created, **kwargs):
-    """Log when an invitation is created or updated"""
+    """Log when an invitation is created or updated and send email notification"""
+    if created:
+        # Send invitation email
+        from .email import send_invitation_email
+        send_invitation_email(instance)
+        
     if ACTIVITY_LOGS_ENABLED:
         if created:
             ActivityLog.objects.create(

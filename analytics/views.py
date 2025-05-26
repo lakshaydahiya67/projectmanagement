@@ -38,16 +38,27 @@ class ActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
     ordering = ['-timestamp']
     
     def get_queryset(self):
+        # First check for organization path parameter
         if 'organization_pk' in self.kwargs:
             org_id = self.kwargs['organization_pk']
             return ActivityLog.objects.filter(
-                content_object__organization__id=org_id
+                organization_id=org_id
             ).select_related('user').order_by('-timestamp')
-        elif 'project_pk' in self.kwargs:
-            project_id = self.kwargs['project_pk']
+        
+        # Check for project path parameter
+        project_id = self.kwargs.get('project_pk')
+        
+        # If project_id is not in kwargs but we're using a nested router, 
+        # the parameter might be named different
+        if not project_id and hasattr(self.request, 'parser_context'):
+            view_kwargs = self.request.parser_context.get('kwargs', {})
+            project_id = view_kwargs.get('project_pk')
+        
+        if project_id:
             return ActivityLog.objects.filter(
-                content_object__project__id=project_id
+                project_id=project_id
             ).select_related('user').order_by('-timestamp')
+            
         return ActivityLog.objects.none()
 
 class ProjectMetricViewSet(viewsets.ViewSet):
