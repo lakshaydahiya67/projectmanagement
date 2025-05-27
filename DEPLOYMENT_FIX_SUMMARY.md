@@ -65,10 +65,29 @@ To complete the email setup for organization invitations on Render:
 ## Current Status
 
 ✅ **Fixed**: Build script environment variable parsing
-✅ **Fixed**: Static files collection permissions
-✅ **Fixed**: Missing email test module
-✅ **Fixed**: Documentation inconsistencies
+✅ **Fixed**: Static files collection permissions (/app directory issue)
+✅ **Fixed**: Missing email test module (email_test.py)
+✅ **Fixed**: Documentation inconsistencies (render-build.sh → build.sh)
+✅ **Fixed**: Separate docker vs render deployment modes
+✅ **Fixed**: Email test module path (python -m email_test → python email_test.py)
+✅ **Added**: RENDER environment variable detection
 ✅ **Ready**: Email invitation system fully implemented
+
+## Deployment Fixes Applied
+
+### Build Script (build.sh):
+1. **Static Files Collection**: Separated "docker" and "django" modes - django mode now uses "render" for static files, avoiding /app directory creation
+2. **Email Test Module**: Fixed path from `python -m email_test` to `python email_test.py`
+3. **Environment Detection**: Added proper RENDER environment variable handling
+4. **Gunicorn Start**: Fixed django mode to properly start gunicorn server
+
+### Render Configuration (render.yaml):
+1. **Added RENDER=true environment variable** for proper environment detection
+
+### Email Test Module (email_test.py):
+1. **Created comprehensive email testing module** with proper Django setup
+2. **Handles both console and SMTP backends** with detailed feedback
+3. **Provides meaningful error messages** for missing configuration
 
 ## Next Steps
 
