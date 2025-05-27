@@ -6,6 +6,8 @@ services:
     buildCommand: chmod +x ./build.sh && ./build.sh build
     startCommand: ./build.sh django
     envVars:
+      - key: RENDER
+        value: "true"
       - key: PYTHON_VERSION
         value: 3.10.12
       - key: DJANGO_SETTINGS_MODULE
@@ -20,6 +22,8 @@ services:
         generateValue: true
       - key: DATABASE_PATH
         value: /opt/render/project/src/db.sqlite3
+      - key: RENDER
+        value: "true"
       # Celery and Redis dependencies have been removed
       - key: ALLOWED_HOSTS
         value: projectmanagement-c23m.onrender.com,localhost,127.0.0.1,.onrender.com

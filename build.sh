@@ -39,9 +39,10 @@ setup_environment() {
         echo -e "${GREEN}.env file found.${NC}"
     fi
     
-    # Source the .env file if it exists
-    if [ -f .env ]; then
-        echo -e "${GREEN}Loading environment variables...${NC}"
+    # Source the .env file if it exists and we're not on Render
+    # Render provides environment variables directly, so we don't need to parse .env
+    if [ -f .env ] && [ -z "$RENDER" ]; then
+        echo -e "${GREEN}Loading environment variables from .env file...${NC}"
         # Use a more robust method to load environment variables
         # Strip inline comments and export valid environment variables
         while IFS= read -r line; do
@@ -56,6 +57,8 @@ setup_environment() {
                 export "$line"
             fi
         done < .env
+    elif [ -n "$RENDER" ]; then
+        echo -e "${GREEN}Running on Render - using environment variables from dashboard${NC}"
     fi
     
     return 0
@@ -124,15 +127,22 @@ collect_static_files() {
     
     # Check if we're in Docker environment
     if [ "$1" = "docker" ]; then
-        # Create staticfiles directory
-        mkdir -p /app/staticfiles
-        chmod -R 777 /app/staticfiles
-        
-        # Run collectstatic
-        python manage.py collectstatic --noinput
-        
-        # Set correct permissions
-        chmod -R 755 /app/staticfiles
+        # Check if /app directory exists and we have permission
+        if [ -d "/app" ] && [ -w "/app" ]; then
+            # Create staticfiles directory
+            mkdir -p /app/staticfiles
+            chmod -R 777 /app/staticfiles
+            
+            # Run collectstatic
+            python manage.py collectstatic --noinput
+            
+            # Set correct permissions
+            chmod -R 755 /app/staticfiles
+        else
+            # Fallback to regular collectstatic if /app is not available
+            echo -e "${YELLOW}Warning: /app directory not available or not writable, using default static collection${NC}"
+            python manage.py collectstatic --noinput --clear
+        fi
     elif [ "$1" = "staticfiles" ]; then
         # For manual staticfiles management with Docker
         docker exec -u root django mkdir -p /app/staticfiles
@@ -200,7 +210,7 @@ else:
 test_email_configuration() {
     if [ "$EMAIL_BACKEND" = "django.core.mail.backends.smtp.EmailBackend" ]; then
         echo -e "${GREEN}Testing email configuration...${NC}"
-        python -m email_test admin@example.com || {
+        python email_test.py admin@example.com || {
             echo -e "${YELLOW}Warning: Email configuration test failed but continuing startup${NC}"
         }
     fi
@@ -234,16 +244,23 @@ main() {
             ;;
         
         # Docker mode for container initialization
-        "docker" | "django")
+        "docker")
             # Redis wait removed (Redis no longer used)
             test_email_configuration
             setup_database "docker"
             collect_static_files "docker"
             create_superuser
+            ;;
+        
+        # Render deployment mode for starting the application
+        "django")
+            # Redis wait removed (Redis no longer used)
+            test_email_configuration
+            setup_database "render"
+            collect_static_files "render"
+            create_superuser
             echo -e "${GREEN}Starting Django application...${NC}"
-            if [ "$mode" = "django" ]; then
-                exec gunicorn projectmanagement.wsgi:application --bind 0.0.0.0:${PORT:-8000}
-            fi
+            exec gunicorn projectmanagement.wsgi:application --bind 0.0.0.0:${PORT:-8000}
             ;;
         
         # Celery worker and beat modes have been removed
