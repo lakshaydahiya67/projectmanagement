@@ -3,8 +3,12 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.conf import settings
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
+try:
+    from channels.layers import get_channel_layer
+    from asgiref.sync import async_to_sync
+    CHANNELS_AVAILABLE = True
+except ImportError:
+    CHANNELS_AVAILABLE = False
 from django.contrib.contenttypes.models import ContentType
 import json
 
@@ -301,20 +305,23 @@ def send_deadline_email(email, task, is_missed=False):
 
 def send_realtime_notification(notification):
     """Send a real-time notification via WebSocket"""
-    channel_layer = get_channel_layer()
-    
-    # Serialize notification data
-    notification_data = {
-        'id': str(notification.id),
-        'notification_type': notification.notification_type,
-        'title': notification.title,
-        'message': notification.message,
-        'created_at': notification.created_at.isoformat(),
-        'read': notification.read,
-    }
-    
-    # Send to user's notification group
+    if not CHANNELS_AVAILABLE:
+        return
+        
     try:
+        channel_layer = get_channel_layer()
+        
+        # Serialize notification data
+        notification_data = {
+            'id': str(notification.id),
+            'notification_type': notification.notification_type,
+            'title': notification.title,
+            'message': notification.message,
+            'created_at': notification.created_at.isoformat(),
+            'read': notification.read,
+        }
+        
+        # Send to user's notification group
         async_to_sync(channel_layer.group_send)(
             f'user_notifications_{notification.recipient.id}',
             {
@@ -323,7 +330,6 @@ def send_realtime_notification(notification):
             }
         )
     except Exception as e:
-        # Log the error but don't raise it to prevent breaking task execution
         import logging
         logger = logging.getLogger(__name__)
         logger.error(f"Failed to send WebSocket notification: {str(e)}")

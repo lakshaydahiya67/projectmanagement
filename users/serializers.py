@@ -2,13 +2,9 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from djoser.serializers import UserCreatePasswordRetypeSerializer as BaseUserCreateSerializer
 from .models import UserPreference
-import re
 import logging
-import sys
 
-# Set up logging for debugging
 logger = logging.getLogger('users.serializers')
 
 User = get_user_model()
@@ -27,44 +23,31 @@ class UserSerializer(serializers.ModelSerializer):
                   'profile_picture', 'phone_number', 'job_title', 'bio', 
                   'date_joined', 'last_modified', 'preferences']
         read_only_fields = ['date_joined', 'last_modified']
-        ref_name = 'ProjectUser'  # Unique reference name for Swagger
+        ref_name = 'ProjectUser'
 
 class UserDetailSerializer(UserSerializer):
     class Meta(UserSerializer.Meta):
         fields = UserSerializer.Meta.fields + ['is_active', 'last_login']
 
-class UserCreateSerializer(BaseUserCreateSerializer):
-    # No need to declare password and re_password again - they're inherited from BaseUserCreateSerializer
+class UserCreateSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+    password_confirm = serializers.CharField(write_only=True)
     
-    class Meta(BaseUserCreateSerializer.Meta):
+    class Meta:
         model = User
-        fields = BaseUserCreateSerializer.Meta.fields + (
-            'first_name', 'last_name', 'profile_picture', 'phone_number', 
-            'job_title', 'bio'
-        )
-    
-    def __init__(self, *args, **kwargs):
-        print(f"DEBUG: UserCreateSerializer.__init__() called", flush=True)
-        sys.stdout.flush()
-        logger.critical(f"UserCreateSerializer.__init__() called")
-        super().__init__(*args, **kwargs)
-        print(f"DEBUG: UserCreateSerializer fields: {list(self.fields.keys())}", flush=True)
-        sys.stdout.flush()
-        logger.critical(f"UserCreateSerializer fields: {list(self.fields.keys())}")
-    
+        fields = ['username', 'email', 'password', 'password_confirm',
+                  'first_name', 'last_name', 'profile_picture', 'phone_number', 
+                  'job_title', 'bio']
+        
     def validate_email(self, value):
         """Validate email is unique"""
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("A user with this email already exists.")
         return value
-    
+        
     def validate_password(self, value):
         """Validate password complexity"""
-        print(f"DEBUG: UserCreateSerializer.validate_password() called with: {value}", flush=True)
-        sys.stdout.flush()
-        logger.critical(f"UserCreateSerializer.validate_password() called with: {value}")
         try:
-            # Use Django's built-in password validation
             validate_password(value)
         except ValidationError as e:
             raise serializers.ValidationError(list(e.messages))
@@ -83,30 +66,21 @@ class UserCreateSerializer(BaseUserCreateSerializer):
             raise serializers.ValidationError("Password must contain at least one special character.")
             
         return value
-    
+        
     def validate(self, attrs):
-        print(f"DEBUG: UserCreateSerializer.validate() called with attrs: {attrs}", flush=True)
-        sys.stdout.flush()
-        logger.critical(f"UserCreateSerializer.validate() called with attrs: {attrs}")
-        # Let the parent class handle password validation
-        attrs = super().validate(attrs)
-        print(f"DEBUG: After parent validation, attrs: {attrs}", flush=True)
-        sys.stdout.flush()
-        logger.critical(f"After parent validation, attrs: {attrs}")
+        password = attrs.get('password')
+        password_confirm = attrs.pop('password_confirm', None)
+        
+        if password != password_confirm:
+            raise serializers.ValidationError("Passwords do not match.")
+            
         return attrs
     
     def create(self, validated_data):
-        print(f"DEBUG: UserCreateSerializer.create() called with validated_data: {validated_data}", flush=True)
-        sys.stdout.flush()
-        logger.critical(f"UserCreateSerializer.create() called with validated_data: {validated_data}")
-        # Let the parent Djoser serializer handle the creation
-        user = super().create(validated_data)
-        print(f"DEBUG: User created: {user.username}, first_name: '{user.first_name}', last_name: '{user.last_name}'", flush=True)
-        sys.stdout.flush()
-        logger.critical(f"User created: {user.username}, first_name: '{user.first_name}', last_name: '{user.last_name}'")
-        
-        # UserPreference will be created via signal handler
-        
+        password = validated_data.pop('password')
+        user = User.objects.create_user(**validated_data)
+        user.set_password(password)
+        user.save()
         return user
 
 class UserUpdateSerializer(serializers.ModelSerializer):
@@ -154,7 +128,6 @@ class ChangePasswordSerializer(serializers.Serializer):
     def validate_new_password(self, value):
         """Validate password complexity"""
         try:
-            # Use Django's built-in password validation
             validate_password(value)
         except ValidationError as e:
             raise serializers.ValidationError(list(e.messages))

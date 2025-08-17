@@ -19,7 +19,7 @@ from django.core.mail import send_mail, EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.conf import settings
-from .email import PasswordResetEmail, ActivationEmail, send_password_reset_email
+from .email import send_password_reset_email
 import logging
 
 # Try to import ActivityLog model if available

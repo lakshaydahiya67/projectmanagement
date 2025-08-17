@@ -3,8 +3,12 @@ from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
+try:
+    from channels.layers import get_channel_layer
+    from asgiref.sync import async_to_sync
+    CHANNELS_AVAILABLE = True
+except ImportError:
+    CHANNELS_AVAILABLE = False
 import json
 
 from .models import Notification, NotificationSetting
@@ -146,6 +150,9 @@ def send_realtime_notification(notification):
     """
     Send a real-time notification via WebSocket
     """
+    if not CHANNELS_AVAILABLE:
+        return  # Skip WebSocket notifications if channels not available
+        
     try:
         channel_layer = get_channel_layer()
         user_channel = f"notifications_{notification.recipient.id}"

@@ -9,7 +9,7 @@ services:
       - key: RENDER
         value: "true"
       - key: PYTHON_VERSION
-        value: 3.10.12
+        value: 3.12.0
       - key: DJANGO_SETTINGS_MODULE
         value: projectmanagement.settings
       - key: DJANGO_SECRET_KEY
@@ -24,7 +24,7 @@ services:
         value: /opt/render/project/src/db.sqlite3
       - key: RENDER
         value: "true"
-      # Celery and Redis dependencies have been removed
+      # Simplified architecture - WebSockets and background tasks removed
       - key: ALLOWED_HOSTS
         value: projectmanagement-c23m.onrender.com,localhost,127.0.0.1,.onrender.com
       - key: DEBUG
@@ -37,18 +37,18 @@ services:
         value: "True"
       - key: SECURE_HSTS_SECONDS
         value: "31536000"
-      # Email configuration for sending organization invitations
+      # Email configuration (using SendGrid)
       - key: EMAIL_BACKEND
         value: django.core.mail.backends.smtp.EmailBackend
       - key: EMAIL_HOST
-        value: smtp.gmail.com
+        value: smtp.sendgrid.net
       - key: EMAIL_PORT
         value: "587"
       - key: EMAIL_USE_TLS
         value: "True"
       - key: EMAIL_HOST_USER
-        sync: false  # Set this to your Gmail address in Render dashboard
+        value: apikey
       - key: EMAIL_HOST_PASSWORD
-        sync: false  # Set this to your Gmail app password in Render dashboard
+        sync: false  # Set your SendGrid API key in Render dashboard
       - key: DEFAULT_FROM_EMAIL
-        value: admin@example.com
+        value: noreply@yourdomain.com

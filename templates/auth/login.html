@@ -16,17 +16,18 @@
                     </div>
                     <div class="alert alert-danger d-none" id="login-error" role="alert"></div>
                     
-                    <form id="login-form">
+                    <form id="login-form" method="post" action="{% url 'user_login' %}">
+                        {% csrf_token %}
                         <div class="mb-3">
-                            <label for="email" class="form-label">Email Address</label>
-                            <input type="email" class="form-control" id="email" name="email" required>
+                            <label for="username" class="form-label">Username or Email</label>
+                            <input type="text" class="form-control" id="username" name="username" required>
                         </div>
                         <div class="mb-3">
                             <label for="password" class="form-label">Password</label>
                             <input type="password" class="form-control" id="password" name="password" required>
                         </div>
                         <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="remember-me">
+                            <input type="checkbox" class="form-check-input" id="remember-me" name="remember_me">
                             <label class="form-check-label" for="remember-me">Remember me</label>
                         </div>
                         <div class="d-grid gap-2">
@@ -38,7 +39,7 @@
                     </form>
                     
                     <div class="mt-3 text-center">
-                        <a href="/forgot-password/" class="text-decoration-none">Forgot password?</a>
+                        <a href="{% url 'password_reset' %}" class="text-decoration-none">Forgot password?</a>
                     </div>
                 </div>
                 <div class="card-footer bg-light text-center py-3">
@@ -53,9 +54,6 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Check if already logged in - but only redirect if we're not coming from an activation page
-        const fromActivation = new URLSearchParams(window.location.search).get('from') === 'activation';
-        const hasNextParam = new URLSearchParams(window.location.search).has('next');
         const fromReset = new URLSearchParams(window.location.search).get('reset') === 'success';
         
         // Show success message if coming from password reset
@@ -70,50 +68,17 @@
             }
         }
         
-        // Only redirect to dashboard if:  
-        // 1. We're not coming from an activation page
-        // 2. We're not being redirected from another page (no 'next' parameter)
-        // 3. We're not coming from a password reset
-        // 4. We're actually authenticated
-        if (!fromActivation && !hasNextParam && !fromReset && app.isAuthenticated()) {
-            window.location.href = '/dashboard/';
-            return;
-        }
-        
-        // Handle login form submission
+        // Simple loading state for the form
         const loginForm = document.getElementById('login-form');
         const loginButton = document.getElementById('login-button');
         const loginButtonText = document.getElementById('login-button-text');
         const loginSpinner = document.getElementById('login-spinner');
-        const loginError = document.getElementById('login-error');
         
-        loginForm.addEventListener('submit', async function(event) {
-            event.preventDefault();
-            
+        loginForm.addEventListener('submit', function(event) {
             // Show loading state
             loginButton.disabled = true;
             loginButtonText.textContent = 'Logging in...';
             loginSpinner.classList.remove('d-none');
-            loginError.classList.add('d-none');
-            
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            
-            try {
-                const rememberMe = document.getElementById('remember-me').checked;
-                const success = await app.login(email, password, rememberMe);
-                if (success) {
-                    window.location.href = '/dashboard/';
-                }
-            } catch (error) {
-                loginError.textContent = error.message || 'Login failed. Please check your credentials.';
-                loginError.classList.remove('d-none');
-                
-                // Reset button state
-                loginButton.disabled = false;
-                loginButtonText.textContent = 'Log In';
-                loginSpinner.classList.add('d-none');
-            }
         });
     });
 </script>

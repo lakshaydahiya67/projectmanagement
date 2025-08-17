@@ -3,7 +3,8 @@ from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 from django.http import JsonResponse, HttpResponse, HttpResponseRedirect, FileResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.cache import cache_control
-from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import logout
 import time
 import os
 from rest_framework import status
@@ -17,13 +18,11 @@ from activitylogs.models import ActivityLog
 from tasks.models import Task
 from django.utils import timezone
 from django.db.models import Q
-from users.decorators import jwt_login_required
 import json
-import logging
 
 logger = logging.getLogger(__name__)
 
-@jwt_login_required
+@login_required
 def dashboard_view(request):
     """
     View function for rendering the dashboard page with initial data
@@ -69,12 +68,12 @@ def dashboard_view(request):
     return render(request, 'dashboard/dashboard.html', context)
 
 
-@jwt_login_required
+@login_required
 def profile_view(request):
     """
     View function for rendering the user profile page
     """
-    # The @jwt_login_required decorator ensures request.user is available
+    # The @login_required decorator ensures request.user is available
     return render(request, 'user/profile.html', {'user': request.user})
 
 
@@ -96,121 +95,17 @@ def activation_view(request, uid, token):
 @require_POST
 def logout_view(request):
     """
-    Custom view to handle JWT token blacklisting during logout
-    
-    This correctly invalidates the refresh token on the server side to ensure
-    full security during logout, preventing token reuse
+    Simple logout view for session-based authentication
     """
-    # Log the request details for debugging
     logger.debug(f"Logout request received from {request.META.get('REMOTE_ADDR')}")
-    logger.debug(f"User agent: {request.META.get('HTTP_USER_AGENT')}")
-    logger.debug(f"Referrer: {request.META.get('HTTP_REFERER')}")
     
-    # Create response object early so we can add cookies regardless of path
-    response = JsonResponse({'detail': 'Logout successful'}, status=status.HTTP_200_OK)
+    # Django's built-in logout
+    logout(request)
     
-    # Force logout by setting session flag
-    if hasattr(request, 'session'):
-        request.session['force_logout'] = 'true'
-        request.session['logout_timestamp'] = str(int(time.time()))
-        request.session.modified = True
-        logger.debug("Set force_logout flag in session")
-        
-    # Add logout timestamp to response headers
-    response['X-Logout-Timestamp'] = str(int(time.time()))
-    response['X-Force-Logout'] = 'true'
-    
-    # Always clear all cookies first regardless of what happens next
-    # Use a more comprehensive list of cookies and paths
-    cookie_names = ['access_token', 'refresh_token', 'csrftoken', 'sessionid', 'jwt', 'token']
-    paths = ['/', '/api/', '/api/v1/', '/auth/', '/dashboard/', '/admin/', '']
-    domains = [None, '', request.get_host(), 'localhost', '127.0.0.1']
-    
-    # Systematically clear all cookies with all possible combinations
-    for cookie_name in cookie_names:
-        # First try with all path and domain combinations
-        for path in paths:
-            for domain in domains:
-                # Try with different SameSite settings
-                response.delete_cookie(cookie_name, path=path, domain=domain, samesite='Lax')
-                response.delete_cookie(cookie_name, path=path, domain=domain, samesite='Strict')
-                response.delete_cookie(cookie_name, path=path, domain=domain, samesite='None')
-                
-                # Also try without SameSite
-                response.delete_cookie(cookie_name, path=path, domain=domain)
-        
-        # Also try without path specification
-        for domain in domains:
-            response.delete_cookie(cookie_name, domain=domain)
-        
-        # And finally try with just the name
-        response.delete_cookie(cookie_name)
-    
-    # Ensure cache control headers are set to prevent caching
-    response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
-    response['Pragma'] = 'no-cache'
-    response['Expires'] = '0'
-    
-    return response
+    return JsonResponse({'detail': 'Logout successful'}, status=status.HTTP_200_OK)
 
 
-@csrf_exempt
-@require_POST
-def complete_logout(request):
-    """
-    Final step in the logout process - handles the form submission from client
-    and ensures a clean redirect to the login page
-    """
-    logger.info("Complete logout endpoint called")
-    
-    # Get the timestamp from the request
-    timestamp = request.POST.get('timestamp', str(int(time.time())))
-    
-    # Create response that redirects to login page with clean_logout parameter
-    # This ensures no 'next' parameter is added which would cause redirect loops
-    response = HttpResponseRedirect(f'/login/?clean_logout=true&t={timestamp}&force_logout=true')
-    
-    # Set force logout in session
-    if hasattr(request, 'session'):
-        request.session['force_logout'] = 'true'
-        request.session['logout_timestamp'] = timestamp
-        request.session.modified = True
-        logger.debug("Set force_logout flag in session during complete-logout")
-    
-    # Add logout timestamp to response headers
-    response['X-Logout-Timestamp'] = timestamp
-    response['X-Force-Logout'] = 'true'
-    
-    # Clear all cookies
-    cookie_names = ['access_token', 'refresh_token', 'csrftoken', 'sessionid', 'jwt', 'token']
-    paths = ['/', '/api/', '/api/v1/', '/auth/', '/dashboard/', '/admin/', '']
-    domains = [None, '', request.get_host(), 'localhost', '127.0.0.1']
-    
-    # Set logout timestamp cookie
-    response.set_cookie(
-        'logout_timestamp',
-        value=timestamp,
-        max_age=300,  # 5 minutes
-        path='/',
-        httponly=True
-    )
-    
-    # Clear all authentication cookies
-    for cookie_name in cookie_names:
-        for path in paths:
-            for domain in domains:
-                try:
-                    response.delete_cookie(cookie_name, path=path, domain=domain)
-                except Exception as e:
-                    logger.error(f"Error clearing cookie {cookie_name} on path {path} domain {domain}: {str(e)}")
-    
-    # Add cache control headers
-    response['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
-    response['Pragma'] = 'no-cache'
-    response['Expires'] = '0'
-    
-    logger.debug(f"Complete-logout request completed successfully")
-    return response
+# complete_logout removed - not needed for session authentication
 
 
 @cache_control(max_age=0, no_cache=True, no_store=True, must_revalidate=True)

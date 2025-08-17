@@ -37,7 +37,7 @@ from organizations.views import (
 from projects.views import project_detail_view, board_detail_view, project_delete_view, project_create_view
 from projects.views_edit import project_update_view
 from tasks.views import task_detail_view, task_create_view, task_update_view
-from .views import dashboard_view, activation_view, logout_view, complete_logout, serve_service_worker, profile_view
+from .views import dashboard_view, activation_view, logout_view, serve_service_worker, profile_view
 
 def health_check(request):
     """Health check endpoint for Docker that verifies database connection"""
@@ -70,15 +70,6 @@ schema_view = get_schema_view(
 
 # API URL patterns
 api_patterns = [
-    # Authentication endpoints
-    path('auth/', include('djoser.urls')),
-    path('auth/jwt/', include('users.jwt_urls')),  # Custom JWT endpoints with remember_me support
-    path('auth/token/logout/', logout_view, name='token_logout'),  # Custom logout handler
-    path('auth/complete-logout/', complete_logout, name='complete_logout'),  # Final logout step handler
-    
-    # Public endpoints that bypass authentication
-    path('public/password-reset/', include('users.public_urls')),  # Direct access to public password reset
-    
     # App-specific API endpoints
     path('users/', include('users.urls')),
     path('organizations/', include('organizations.urls')),
@@ -125,10 +116,8 @@ urlpatterns = [
     # Include app URLs (API routes)
     path('api/v1/', include(api_patterns)),
     
-    # Note: Auth endpoints are already included in api_patterns
-    # These ones are for direct access without the /api/v1/ prefix
-    # The full auth URLs are included for specific activation endpoints
-    path('auth/', include('djoser.urls')),  # Include base Djoser URLs for activation
+    # Django authentication URLs
+    path('accounts/', include('django.contrib.auth.urls')),  # Built-in auth views
     
     # API Documentation
     re_path(r'^api/docs/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),

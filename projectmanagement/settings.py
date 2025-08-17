@@ -32,7 +32,7 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'k8h9j@#$%^&*()_+=-][{}|":?><,.
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,.render.com').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,.render.com,testserver').split(',')
 
 # Frontend URL for redirects and email links
 # Ensure we have a single valid URL for SITE_URL
@@ -49,9 +49,14 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'corsheaders',  # Add CORS headers support explicitly
-    # Third-party apps will be inserted here
 ]
+
+# Add CORS headers if available
+try:
+    import corsheaders
+    INSTALLED_APPS.append('corsheaders')
+except ImportError:
+    pass
 
 # Conditionally add third-party apps if installed
 try:
@@ -68,30 +73,16 @@ try:
     INSTALLED_APPS.append('rest_framework')
     INSTALLED_APPS.append('rest_framework.authtoken')
     
-    # Add SimpleJWT token blacklist app
-    try:
-        import rest_framework_simplejwt
-        INSTALLED_APPS.append('rest_framework_simplejwt')
-        INSTALLED_APPS.append('rest_framework_simplejwt.token_blacklist')
-    except ImportError:
-        pass
+    # Session authentication only - JWT removed
 except ImportError:
     pass
 
 # CORS headers already added in INSTALLED_APPS above
 pass
 
-try:
-    import djoser
-    INSTALLED_APPS.append('djoser')
-except ImportError:
-    pass
+    # Djoser removed - using Django's built-in authentication
 
-try:
-    import channels
-    INSTALLED_APPS.append('channels')  # For WebSocket support
-except ImportError:
-    pass
+# Channels removed - no WebSocket support
 
 try:
     import django_filters
@@ -120,15 +111,20 @@ MIDDLEWARE = [
     'projectmanagement.security_middleware.SecurityMiddleware',  # Add security middleware first
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',  # Add CORS middleware before CommonMiddleware
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'users.http_middleware.JWTAuthenticationMiddleware',  # Add JWT authentication middleware
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'projectmanagement.middleware.ServiceWorkerMiddleware',  # Add Service-Worker-Allowed header for service worker
 ]
+
+# Add CORS middleware if available
+try:
+    import corsheaders
+    MIDDLEWARE.insert(3, 'corsheaders.middleware.CorsMiddleware')
+except ImportError:
+    pass
 
 # Add activity log middleware if it's available
 try:
@@ -236,24 +232,19 @@ AUTH_USER_MODEL = 'users.User'
 
 # Authentication backends
 AUTHENTICATION_BACKENDS = [
-    'users.auth.JWTAuthenticationBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
 # REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',  # Add session auth as fallback
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
     ),
-    # Use IsAuthenticatedOrReadOnly instead of IsAuthenticated to allow unauthenticated access to GET requests
-    # Individual views can still override this with @permission_classes
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
-    # Define public endpoints that don't require authentication
     'UNAUTHENTICATED_USER': 'django.contrib.auth.models.AnonymousUser',
-    # Ensure authentication errors are properly reported
     'EXCEPTION_HANDLER': 'projectmanagement.utils.custom_exception_handler',
     'DEFAULT_FILTER_BACKENDS': (
         'django_filters.rest_framework.DjangoFilterBackend',
@@ -277,74 +268,14 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': int(os.environ.get('DEFAULT_PAGE_SIZE', 10))
 }
 
-# JWT Settings
-JWT_ACCESS_TOKEN_LIFETIME_MINUTES = int(os.environ.get('JWT_ACCESS_TOKEN_LIFETIME_MINUTES', 60))
-JWT_REFRESH_TOKEN_LIFETIME_DAYS = int(os.environ.get('JWT_REFRESH_TOKEN_LIFETIME_DAYS', 7))
+# Session authentication settings - replacing JWT
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/dashboard/'
+LOGOUT_REDIRECT_URL = '/login/'
 
-# JWT Security Configuration - Hardened for production
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=JWT_ACCESS_TOKEN_LIFETIME_MINUTES),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=JWT_REFRESH_TOKEN_LIFETIME_DAYS),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
-    'UPDATE_LAST_LOGIN': True,
-    'SIGNING_KEY': os.environ.get('JWT_SIGNING_KEY', SECRET_KEY),
-    'ALGORITHM': 'HS256',
-    'AUTH_HEADER_TYPES': ('Bearer',),
-    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
-    'USER_ID_FIELD': 'id',
-    'USER_ID_CLAIM': 'user_id',
-    'USER_AUTHENTICATION_RULE': 'rest_framework_simplejwt.authentication.default_user_authentication_rule',
-    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
-    'TOKEN_TYPE_CLAIM': 'token_type',
-    'TOKEN_USER_CLASS': 'rest_framework_simplejwt.models.TokenUser',
-    'JTI_CLAIM': 'jti',
-    
-    # Enhanced security settings
-    'TOKEN_OBTAIN_SERIALIZER': 'rest_framework_simplejwt.serializers.TokenObtainPairSerializer',
-    'TOKEN_REFRESH_SERIALIZER': 'rest_framework_simplejwt.serializers.TokenRefreshSerializer',
-    'TOKEN_VERIFY_SERIALIZER': 'rest_framework_simplejwt.serializers.TokenVerifySerializer',
-    'TOKEN_BLACKLIST_SERIALIZER': 'rest_framework_simplejwt.serializers.TokenBlacklistSerializer',
-    
-    # Security headers
-    'AUTH_COOKIE': None,  # Disable cookies for security
-    'AUTH_COOKIE_DOMAIN': None,
-    'AUTH_COOKIE_SECURE': not DEBUG,  # HTTPS only in production
-    'AUTH_COOKIE_HTTP_ONLY': True,  # Prevent XSS
-    'AUTH_COOKIE_SAMESITE': 'Lax',  # CSRF protection
-}
-
-# Custom JWT settings for remember_me functionality
-# These settings define extended token lifetimes when remember_me is True
-SIMPLE_JWT_REMEMBER_ACCESS_TOKEN_LIFETIME = timedelta(hours=int(os.environ.get('JWT_REMEMBER_ACCESS_TOKEN_LIFETIME_HOURS', 24)))
-SIMPLE_JWT_REMEMBER_REFRESH_TOKEN_LIFETIME = timedelta(days=int(os.environ.get('JWT_REMEMBER_REFRESH_TOKEN_LIFETIME_DAYS', 30)))
-
-# Djoser settings
-DJOSER = {
-    'PASSWORD_RESET_CONFIRM_URL': 'password/reset/confirm/{uid}/{token}',
-    'USERNAME_RESET_CONFIRM_URL': 'username/reset/confirm/{uid}/{token}',
-    'ACTIVATION_URL': 'activate/{uid}/{token}',
-    'SEND_ACTIVATION_EMAIL': True,
-    'SERIALIZERS': {
-        'user_create': 'users.serializers.UserCreateSerializer',
-        'user_create_password_retype': 'users.serializers.UserCreateSerializer',
-        'user': 'users.serializers.UserSerializer',
-        'current_user': 'users.serializers.UserDetailSerializer',
-    },
-    'EMAIL': {
-        'password_reset': 'users.email.PasswordResetEmail',
-        'activation': 'users.email.ActivationEmail',
-        'confirmation': 'users.email.ActivationEmail',
-    },
-    # Fix: Properly parse the SITE_URL to extract just the domain
-    # This handles cases where SITE_URL might contain multiple domains
-    'DOMAIN': SITE_URL.replace('http://', '').replace('https://', '').split(',')[0].strip(),
-    'SITE_NAME': 'Project Management',
-    'PASSWORD_RESET_SHOW_EMAIL_NOT_FOUND': False,
-    'PASSWORD_RESET_CONFIRM_RETYPE': True,
-    'TOKEN_MODEL': None,  # Use JWT tokens, not database tokens
-    'USER_CREATE_PASSWORD_RETYPE': True,
-}
+# User account settings
+ACCOUNT_ACTIVATION_DAYS = 7
+REGISTRATION_OPEN = True
 
 # CORS settings - SECURITY CRITICAL: Never allow wildcard origins with credentials
 CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000,http://127.0.0.1:8000').split(',')
@@ -418,13 +349,8 @@ SESSION_COOKIE_AGE = 86400  # 1 day in seconds
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SESSION_SAVE_EVERY_REQUEST = True
 
-# Channels configuration
+# ASGI application (simplified, no WebSockets)
 ASGI_APPLICATION = 'projectmanagement.asgi.application'
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',
-    },
-}
 
 # Note: Celery and Redis dependencies have been removed from the project.
 # All async tasks are now executed synchronously.
